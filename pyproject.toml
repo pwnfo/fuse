@@ -1,5 +1,5 @@
 [project]
-name = "fuse"
+name = "fuse-cli"
 version = "0.1.0"
 description = "Fuse: Customizable wordlist generator with advanced pattern."
 authors = [

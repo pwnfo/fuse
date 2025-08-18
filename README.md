@@ -49,7 +49,7 @@ Install Fuse directly from PyPI or GitHub:
 
 ### From PyPI (recommended)
 ```
-pip install fuse-wordlists
+pip install fuse-cli
 ```
 
 ### From GitHub
