@@ -1,0 +1,5 @@
+%file ./wordlists/users.txt
+%file ./wordlists/pass.txt
+
+# <user>:<pass>
+@:@

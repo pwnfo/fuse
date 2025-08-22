@@ -13,9 +13,16 @@ wchars = [
 ]
 
 
-def pattern_repl(pattern: str) -> str:
-    for x in wchars:
-        pattern = re.sub(rf"(?<!\\)\/{x[0]}", f"[{x[1]}]", pattern)
-        pattern = re.sub(rf"(?<!\\)\*{x[0]}", x[1], pattern)
+def pattern_repl(pattern: str, wc: str = "/") -> str:
+    def i_replace(m: re.Match) -> str:
+        expr = m.group(0)
+        if expr.startswith("["):
+            return expr.replace(i_old, i_new)
+        return expr.replace(i_old, f"[{i_new}]")
+
+    for _ in wchars:
+        i_old = wc + _[0]
+        i_new = _[1]
+        pattern = re.sub(r"\[[^\]]*\]|[^[]+", i_replace, pattern)
 
     return pattern

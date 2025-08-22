@@ -80,7 +80,7 @@ class FileNode(Node):
                     yield "".join(tup)
 
 
-class Interpreter:
+class Gen:
     BRACES_RE = re.compile(r"\{(\d+)(?:\s*,\s*(\d+))?\}")
 
     def tokenize(self, pattern: str) -> list[tuple[str, Any]]:
@@ -315,32 +315,37 @@ class Interpreter:
         return self._stats_from_nodes(nodes)
 
 
-# if __name__ == "__main__":
-#     if len(sys.argv) < 2:
-#         print('"PATTERN" is required.')
-#         sys.exit(1)
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print('"PATTERN" is required.')
+        sys.exit(1)
 
-#     pattern = sys.argv[1]
-#     files = sys.argv[2:]
-#     interp = Interpreter()
+    pattern = sys.argv[1]
+    files = sys.argv[2:]
+    generator = Gen()
 
-#     try:
-#         tokens = interp.tokenize(pattern)
-#         print("TOKENS:", tokens)
-#         nodes = interp.nodes(pattern, files=files if files else None)
-#         for i, node in enumerate(nodes):
-#             print(f"NODES[{i}]: {node}")
-#     except ExprError as e:
-#         print("ERROR:", e)
-#         sys.exit(1)
+    try:
+        tokens = generator.tokenize(pattern)
+        for _, token in enumerate(tokens):
+            print(f"=== TOKEN[{_}] ===", f"\n  TYPE: {token[0]}\n  VALUE: {token[1]}")
+        nodes = generator.nodes(pattern, files=files if files else None)
+        print("------")
+        for _, node in enumerate(nodes):
+            print(
+                f"=== NODE[{_}] ===",
+                f"\n  BASE: {node.base}\n  REP: {node.min_rep}-{node.max_rep}",
+            )
+    except ExprError as e:
+        print("ERROR:", e)
+        sys.exit(1)
 
-#     answer = input("Generate? [y/N] ").strip().lower()
-#     if answer != "y":
-#         sys.exit(0)
+    answer = input("Generate? [y/N] ").strip().lower()
+    if answer != "y":
+        sys.exit(0)
 
-#     try:
-#         for s in interp.expand_pattern(pattern, files=files if files else None):
-#             print(s)
-#     except ExprError as e:
-#         print("ERROR:", e)
-#         sys.exit(1)
+    try:
+        for s in generator.expand_pattern(pattern, files=files if files else None):
+            print(s)
+    except ExprError as e:
+        print("ERROR:", e)
+        sys.exit(1)

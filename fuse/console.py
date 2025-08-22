@@ -25,6 +25,8 @@ try:
         fuse_err_console = Console(file=sys.stderr)
 
         def emit(self, record: logging.LogRecord) -> Any:
+
+            # joga erros no stderr
             if record.levelno < logging.WARNING:
                 self.console = self.fuse_console
             else:
@@ -107,16 +109,16 @@ def console_input(prompt: str, fprompt: str | None = None, **kwargs: Any) -> str
 
 log = setup_logger()
 
-# if __name__ == "__main__":
-#     log.setLevel(logging.DEBUG)
-#     try:
-#         1 / 0  # type: ignore
-#     except:
-#         log.exception("Exception...")
-#     log.debug("Debug...")
-#     log.warning("Warning...")
-#     log.info("Info...")
-#     log.error("Error...")
-#     log.critical("Criticial...")
+if __name__ == "__main__":
+    log.setLevel(logging.DEBUG)
+    try:
+        1 / 0  # type: ignore
+    except:
+        log.exception("Exception...")
+    log.debug("Debug...")
+    log.warning("Warning...")
+    log.info("Info...")
+    log.error("Error...")
+    log.critical("Criticial...")
 
-#     log.info("Info with\nBreak line...")
+    log.info("Info with\nBreak line...")

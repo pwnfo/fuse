@@ -33,7 +33,7 @@ def r_open(file: str | None, *args: Any, **kwargs: Any) -> Iterator[IO[Any] | No
                 pass
 
 
-def format_size(b: int | float, d: int = 2) -> str:
+def format_size(b: int | float, d: int = 0) -> str:
     try:
         for unit in ["B", "KB", "MB", "GB", "TB", "PB"]:
             if b < 1024:

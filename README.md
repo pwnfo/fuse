@@ -103,7 +103,6 @@ $ fuse "/l/l"
 You can create classes with bracket syntax `[...]`. Inside brackets you may list characters or use `|` to separate full-word alternatives.
 
 ```
-[XYZ*d]     # short-hand union of X, Y, Z and class /d
 [hello]     # characters: h, e, l, l, o
 [admin|pass|12345678]  # whole-word alternatives
 ```
@@ -112,8 +111,6 @@ You can create classes with bracket syntax `[...]`. Inside brackets you may list
 
 * `[abc]` selects one character from the set `a`, `b` or `c`.
 * `[admin|root]` will treat `admin` and `root` as alternatives (each alternative is inserted as a multi-character token).
-* Use a leading `*` inside a bracket (e.g. `[*d*A]`) as a shorthand for union of existing classes.
-> `*d` == 0123456789
 
 ### Quantifiers
 
@@ -175,7 +172,7 @@ $ fuse "/l{2,4}"
 # sample: aa, ab, ..., ZZZZ
 
 # 3-byte words mixing letters and digits
-$ fuse "[*l*d]{3}"
+$ fuse "[/l/d]{3}"
 # sample: 0A0, 0A1, ..., Z9Z
 
 # joining two files with a separator

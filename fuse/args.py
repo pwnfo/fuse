@@ -34,6 +34,8 @@ def create_parser(prog: str = "fuse") -> FuseParser:
     options.add_argument("-f", "--file", metavar="<path>", dest="expr_file", help="files with different expressions")
     options.add_argument("-q", "--quiet", action="store_true", dest="quiet", help="use quiet mode")
     options.add_argument("-b", "--buffer", type=int, metavar="<bytes>", dest="buffer", default=(1024 * 1024) * 256, help="buffer size in wordlist generation (default: 256KB)")
+    options.add_argument("-s", "--separator", metavar="<sep>", dest="separator", default="\n", help="separator beetwen entries")
+
 
     parser.add_argument("expression", nargs="?", help=argparse.SUPPRESS)
     parser.add_argument("files", nargs="*", help=argparse.SUPPRESS)
