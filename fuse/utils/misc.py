@@ -8,6 +8,7 @@ from ..console import log
 
 @contextmanager
 def r_open(file: str | None, *args: Any, **kwargs: Any) -> Iterator[IO[Any] | None]:
+    """Opens file and handles possible errors. Returns `sys.stdout` if `file=None`"""
     if file is None:
         yield sys.stdout
     else:
@@ -34,6 +35,7 @@ def r_open(file: str | None, *args: Any, **kwargs: Any) -> Iterator[IO[Any] | No
 
 
 def format_size(b: int | float, d: int = 0) -> str:
+    """Returns a formatted string of `b`"""
     try:
         for unit in ["B", "KB", "MB", "GB", "TB", "PB"]:
             if b < 1024:
@@ -45,6 +47,7 @@ def format_size(b: int | float, d: int = 0) -> str:
 
 
 def format_time(seconds: float) -> str:
+    """Transforms `seconds` into a formatted string"""
     seconds = int(seconds)
     h, rem = divmod(seconds, 3600)
     m, s = divmod(rem, 60)

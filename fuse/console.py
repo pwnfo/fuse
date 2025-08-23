@@ -70,6 +70,7 @@ def setup_logger() -> logging.Logger:
 
 
 def get_progress(e: Event, r: Any, total: int = 100) -> None:
+    """Show progress bar to stdout"""
     if nocolor:
         while r.value < total:
             if e.is_set():

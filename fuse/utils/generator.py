@@ -21,6 +21,7 @@ class Node:
         return f"<Node base={self.base!r} {{{self.min_rep},{self.max_rep}}}>"
 
     def expand(self) -> Generator[str, None, None]:
+        """Generate all possible Node words"""
         if isinstance(self.base, list):
             choices = self.base
         else:
@@ -38,8 +39,9 @@ class FileNode(Node):
     def __repr__(self) -> str:
         return f"<FileNode files={self.base!r} {{{self.min_rep},{self.max_rep}}}>"
 
-    def _collect_lines(self) -> List[str] | Never:
-        lines: List[str] = []
+    def _collect_lines(self) -> list[str] | Never:
+        """Returns all lines of the file"""
+        lines: list[str] = []
         for path in self.base:
             with r_open(path, "r", encoding="utf-8", errors="ignore") as fp:
                 if fp:
@@ -53,6 +55,12 @@ class FileNode(Node):
         return lines
 
     def stats_info(self) -> tuple[int, int] | Never:
+        """Returns the statistics of this specific file
+
+        Returns:
+            tuple[int, int] -> Tuple containing the number of words
+                               to be generated (index 0) and total bytes (index 1)
+        """
         k = 0
         sum_len = 0
         for path in self.base:
@@ -69,6 +77,7 @@ class FileNode(Node):
         return k, sum_len
 
     def expand(self) -> Generator[str, None, None]:
+        """Generates the words from the file"""
         choices = self._collect_lines()
         k = len(choices)
 
@@ -84,6 +93,12 @@ class Gen:
     BRACES_RE = re.compile(r"\{(\d+)(?:\s*,\s*(\d+))?\}")
 
     def tokenize(self, pattern: str) -> list[tuple[str, Any]]:
+        """Transforms the pattern into a list of tokens
+
+        Returns:
+            list[tuple[str, Any]] -> list containing the token type
+                                     and its value in each index
+        """
         pattern = pattern_repl(pattern)
         i, n = 0, len(pattern)
         tokens: list[tuple[str, Any]] = []
@@ -182,7 +197,8 @@ class Gen:
 
     def parse(
         self, tokens: list[tuple[str, Any]], files: List[str] | None = None
-    ) -> list[Node]:
+    ) -> list[Node | FileNode]:
+        """Transforms a list of tokens into a list of nodes (`Node` and/or `FileNode`)"""
         i = 0
         L = len(tokens)
         nodes: list[Node] = []
@@ -245,6 +261,7 @@ class Gen:
     def _combine_recursive(
         self, nodes: list[Node], idx: int = 0
     ) -> Generator[str, None, None]:
+        """Calls the `expand` method of each node"""
         if idx >= len(nodes):
             yield ""
             return
@@ -253,23 +270,25 @@ class Gen:
             for suffix in self._combine_recursive(nodes, idx + 1):
                 yield part + suffix
 
-    def generate(self, nodes: list[Node]) -> Generator[str, None, None]:
+    def generate(self, nodes: list[Node | FileNode]) -> Generator[str, None, None]:
+        """Call `_combine_recursive` to generate the possible words from the list of `Node`"""
         yield from self._combine_recursive(nodes, 0)
 
-    def expand_pattern(
-        self, pattern: str, files: List[str] | None = None
-    ) -> Generator[str, None, None]:
-        tokens = self.tokenize(pattern)
-        nodes = self.parse(tokens, files=files)
-        return self.generate(nodes)
+    # def expand_pattern(
+    #     self, pattern: str, files: List[str] | None = None
+    # ) -> Generator[str, None, None]:
+    #     tokens = self.tokenize(pattern)
+    #     nodes = self.parse(tokens, files=files)
+    #     return self.generate(nodes)
 
-    def tokens(self, pattern: str) -> list[tuple[str, Any]]:
-        return self.tokenize(pattern)
+    # def tokens(self, pattern: str) -> list[tuple[str, Any]]:
+    #     return self.tokenize(pattern)
 
-    def nodes(self, pattern: str, files: List[str] | None = None) -> list[Node]:
-        return self.parse(self.tokenize(pattern), files=files)
+    # def nodes(self, pattern: str, files: List[str] | None = None) -> list[Node]:
+    #     return self.parse(self.tokenize(pattern), files=files)
 
-    def _stats_from_nodes(self, nodes: list[Node]) -> tuple[int, int]:
+    def _stats_from_nodes(self, nodes: list[Node | FileNode]) -> tuple[int, int]:
+        """Method that will be called by `stats`"""
         total_count = 1
         total_bytes = 0
 
@@ -312,6 +331,7 @@ class Gen:
         return int(total_bytes), int(total_count)
 
     def stats(self, nodes: list[Node]) -> tuple[int, int]:
+        """Generate statistics (number of bytes and words that are generated) for each `Node` or `FileNode`"""
         return self._stats_from_nodes(nodes)
 
 
@@ -328,7 +348,7 @@ if __name__ == "__main__":
         tokens = generator.tokenize(pattern)
         for _, token in enumerate(tokens):
             print(f"=== TOKEN[{_}] ===", f"\n  TYPE: {token[0]}\n  VALUE: {token[1]}")
-        nodes = generator.nodes(pattern, files=files if files else None)
+        nodes = generator.parse(tokens, files=files if files else None)
         print("------")
         for _, node in enumerate(nodes):
             print(
@@ -344,7 +364,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     try:
-        for s in generator.expand_pattern(pattern, files=files if files else None):
+        for s in generator.generate(nodes):
             print(s)
     except ExprError as e:
         print("ERROR:", e)

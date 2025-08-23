@@ -29,6 +29,7 @@ def generate(
     quiet_mode: bool = False,
     sep: str = "\n",
 ) -> int:
+    """Function to generate words"""
     progress = Progress()
 
     event = threading.Event()
@@ -68,6 +69,7 @@ def generate(
 
 
 def f_expression(expression: str, files: list) -> tuple[str, list]:
+    """Formats string to allow inline expressions and files"""
     n = 0
     i_count = 0
 
