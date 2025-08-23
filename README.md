@@ -87,6 +87,7 @@ Common built-in classes (examples):
 /s  - space
 /o  - octal digits (0-7)
 /p  - special characters
+/N  - break line (\n)
 ```
 
 Use these directly in expressions, for example: `/l/l` generates two-letter combinations where each letter may be lower or upper case.

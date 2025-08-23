@@ -10,6 +10,7 @@ wchars = [
     ["o", "01234567"],
     ["p", "!@#$%^&*()-_+="],
     ["l", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"],
+    ["N", "\n"],
 ]
 
 
