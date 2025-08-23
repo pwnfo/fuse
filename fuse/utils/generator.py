@@ -4,7 +4,7 @@ import sys
 from itertools import product
 from typing import Generator, Any, List, Never
 
-from .wchars import pattern_repl
+from .classes import pattern_repl
 from .misc import r_open
 
 

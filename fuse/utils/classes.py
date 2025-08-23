@@ -1,6 +1,6 @@
 import re
 
-wchars = [
+char_classes = [
     ["d", "0123456789"],
     ["h", "0123456789abcdef"],
     ["H", "0123456789ABCDEF"],
@@ -21,7 +21,7 @@ def pattern_repl(pattern: str, wc: str = "/") -> str:
             return expr.replace(i_old, i_new)
         return expr.replace(i_old, f"[{i_new}]")
 
-    for _ in wchars:
+    for _ in char_classes:
         i_old = wc + _[0]
         i_new = _[1]
         pattern = re.sub(r"\[[^\]]*\]|[^[]+", i_replace, pattern)
