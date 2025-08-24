@@ -8,10 +8,12 @@ from time import perf_counter
 from logging import ERROR
 from dataclasses import dataclass
 
-from .console import log, get_progress, console_input
+from .logger import log
+from .console import get_progress, console_input
 from .args import create_parser
 
-from .utils.misc import r_open, format_size, format_time
+from .utils.files import r_open
+from .utils.formatters import format_size, format_time, parse_size
 from .utils.generator import Gen, Node, ExprError
 
 
@@ -118,6 +120,17 @@ def main() -> int:
     if args.quiet:
         log.setLevel(ERROR)
 
+    if args.buffer.upper() != "AUTO":
+        try:
+            buffer = parse_size(args.buffer)
+            if buffer <= 0:
+                raise ValueError("the value cannot be <= 0")
+        except ValueError as e:
+            log.error(f"invalid buffer size: {e}")
+            return 1
+    else:
+        buffer = -1
+
     expression = args.expression
     generator = Gen()
 
@@ -135,8 +148,8 @@ def main() -> int:
                     continue
                 for alias in aliases:
                     expression = re.sub(r"(?<!\\)\$" + alias[0], alias[1], expression)
+                fields = expression.split(" ")
                 if expression.startswith(r"%alias "):
-                    fields = expression.split(" ")
                     if len(fields) < 3:
                         log.error(
                             r"Invalid File: '%alias' keyword requires 2 arguments."
@@ -147,18 +160,19 @@ def main() -> int:
                     aliases.append((alias, alias_value))
                     continue
                 elif expression.startswith(r"%file "):
-                    fields = expression.split(" ")
                     if len(fields) < 2:
                         log.error(
                             r"Invalid File: '%file' keyword requires 1 arguments."
                         )
                         return 1
-                    files.append(fields[1].strip())
+                    files.append(" ".join(fields[1:]).strip())
                     continue
                 try:
                     tokens = generator.tokenize(expression)
                     nodes = generator.parse(tokens, files=(files or None))
-                    s_bytes, s_words = generator.stats(nodes)
+                    s_bytes, s_words = generator.stats(
+                        nodes, sep_len=len(args.separator)
+                    )
                     files = []
                 except ExprError as e:
                     log.error(f"Expression Error: {e}")
@@ -171,7 +185,7 @@ def main() -> int:
                     nodes,
                     total_bytes=s_bytes,
                     filename=args.output,
-                    buffering=args.buffer,
+                    buffering=buffer,
                     quiet_mode=args.quiet,
                     sep=args.separator,
                 )
@@ -184,7 +198,7 @@ def main() -> int:
     try:
         tokens = generator.tokenize(expression)
         nodes = generator.parse(tokens, files=(files or None))
-        s_bytes, s_words = generator.stats(nodes)
+        s_bytes, s_words = generator.stats(nodes, sep_len=len(args.separator))
     except ExprError as e:
         log.error(f"expression error: {e}")
         return 1
@@ -207,7 +221,7 @@ def main() -> int:
         nodes,
         s_bytes,
         filename=args.output,
-        buffering=args.buffer,
+        buffering=buffer,
         quiet_mode=args.quiet,
         sep=args.separator,
     )

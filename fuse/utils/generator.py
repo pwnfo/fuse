@@ -5,7 +5,7 @@ from itertools import product
 from typing import Generator, Any, List, Never
 
 from .classes import pattern_repl
-from .misc import r_open
+from .files import r_open
 
 
 class ExprError(Exception): ...
@@ -274,20 +274,9 @@ class Gen:
         """Call `_combine_recursive` to generate the possible words from the list of `Node`"""
         yield from self._combine_recursive(nodes, 0)
 
-    # def expand_pattern(
-    #     self, pattern: str, files: List[str] | None = None
-    # ) -> Generator[str, None, None]:
-    #     tokens = self.tokenize(pattern)
-    #     nodes = self.parse(tokens, files=files)
-    #     return self.generate(nodes)
-
-    # def tokens(self, pattern: str) -> list[tuple[str, Any]]:
-    #     return self.tokenize(pattern)
-
-    # def nodes(self, pattern: str, files: List[str] | None = None) -> list[Node]:
-    #     return self.parse(self.tokenize(pattern), files=files)
-
-    def _stats_from_nodes(self, nodes: list[Node | FileNode]) -> tuple[int, int]:
+    def _stats_from_nodes(
+        self, nodes: list[Node | FileNode], sep_len: int = 1
+    ) -> tuple[int, int]:
         """Method that will be called by `stats`"""
         total_count = 1
         total_bytes = 0
@@ -328,11 +317,11 @@ class Gen:
 
             total_count, total_bytes = new_count, new_bytes
 
-        return int(total_bytes), int(total_count)
+        return int(total_bytes + (sep_len * total_count)), int(total_count)
 
-    def stats(self, nodes: list[Node]) -> tuple[int, int]:
+    def stats(self, nodes: list[Node], sep_len: int = 1) -> tuple[int, int]:
         """Generate statistics (number of bytes and words that are generated) for each `Node` or `FileNode`"""
-        return self._stats_from_nodes(nodes)
+        return self._stats_from_nodes(nodes, sep_len=sep_len)
 
 
 if __name__ == "__main__":

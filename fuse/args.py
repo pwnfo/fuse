@@ -3,7 +3,7 @@ from fuse import __description__, __author__, __version__
 import sys
 import argparse
 
-from .console import log
+from .logger import log
 
 from typing import Never
 
@@ -33,7 +33,7 @@ def create_parser(prog: str = "fuse") -> FuseParser:
     options.add_argument("-o", "--output", metavar="<path>", dest="output", help="write the wordlist in the file")
     options.add_argument("-f", "--file", metavar="<path>", dest="expr_file", help="files with different expressions")
     options.add_argument("-q", "--quiet", action="store_true", dest="quiet", help="use quiet mode")
-    options.add_argument("-b", "--buffer", type=int, metavar="<bytes>", dest="buffer", default=(1024 * 1024) * 256, help="buffer size in wordlist generation (default: 256KB)")
+    options.add_argument("-b", "--buffer", metavar="<bytes>", dest="buffer", default="AUTO", help="buffer size in wordlist generation")
     options.add_argument("-s", "--separator", metavar="<sep>", dest="separator", default="\n", help="separator beetwen entries")
 
 
