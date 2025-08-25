@@ -40,7 +40,11 @@ class FileNode(Node):
         return f"<FileNode files={self.base!r} {{{self.min_rep},{self.max_rep}}}>"
 
     def _collect_lines(self) -> list[str] | Never:
-        """Returns all lines of the file"""
+        """Returns all lines of the file (cached)"""
+        if hasattr(self, "_lines"):
+            self._lines: list[str]
+            return self._lines
+
         lines: list[str] = []
         for path in self.base:
             with r_open(path, "r", encoding="utf-8", errors="ignore") as fp:
@@ -52,6 +56,8 @@ class FileNode(Node):
                     sys.exit(1)
         if not lines:
             raise ExprError("file node produced no lines (empty files?).")
+
+        self._lines = lines
         return lines
 
     def stats_info(self) -> tuple[int, int] | Never:
@@ -270,9 +276,30 @@ class Gen:
             for suffix in self._combine_recursive(nodes, idx + 1):
                 yield part + suffix
 
-    def generate(self, nodes: list[Node | FileNode]) -> Generator[str, None, None]:
-        """Call `_combine_recursive` to generate the possible words from the list of `Node`"""
-        yield from self._combine_recursive(nodes, 0)
+    def generate(
+        self, nodes: list[Node | FileNode], start_from: str | None = None
+    ) -> Generator[str, None, None]:
+        """Call `_combine_recursive` to generate the possible words from the list of `Node`.
+
+        If `start_from` is provided (a string), the generator will skip all items until it
+        finds a generated string equal to `start_from` and then yield from there (inclusive).
+        If `start_from` is None, behaves exactly like the old `generate`.
+        """
+        gen = self._combine_recursive(nodes, 0)
+        if start_from is None:
+            yield from gen
+            return
+
+        found = False
+        for s in gen:
+            if not found:
+                if s == start_from:
+                    found = True
+                    yield s
+                else:
+                    continue
+            else:
+                yield s
 
     def _stats_from_nodes(
         self, nodes: list[Node | FileNode], sep_len: int = 1
@@ -322,6 +349,24 @@ class Gen:
     def stats(self, nodes: list[Node], sep_len: int = 1) -> tuple[int, int]:
         """Generate statistics (number of bytes and words that are generated) for each `Node` or `FileNode`"""
         return self._stats_from_nodes(nodes, sep_len=sep_len)
+
+    def _node_count(self, node: Node | FileNode) -> int:
+        """Return how many strings this node will produce in total."""
+        if isinstance(node, FileNode):
+            choices = node._collect_lines()
+            k = len(choices)
+        else:
+            base = node.base
+            if isinstance(base, list):
+                choices = [str(x) for x in base]
+            else:
+                choices = [str(base)]
+            k = len(choices)
+
+        total = 0
+        for r in range(node.min_rep, node.max_rep + 1):
+            total += 1 if r == 0 else k**r
+        return total
 
 
 if __name__ == "__main__":

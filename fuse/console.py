@@ -31,6 +31,14 @@ def calc_rate(prev_bytes: int, curr_bytes: int, delta_time: float) -> str:
 def get_progress(e: Event, r: Any, total: int = 100) -> None:
     """Show progress bar"""
     if FUSE_NOCOLOR:
+        x = 0
+        while not r.ready:
+            if e.is_set():
+                return
+            ret = "." * ((x % 3) + 1)
+            sys.stdout.write(f"Starting{ret}   \r")
+            x += 1
+            sleep(0.5)
         sys.stdout.write("\033[?25l")
         while r.value < total:
             if e.is_set():
@@ -45,6 +53,13 @@ def get_progress(e: Event, r: Any, total: int = 100) -> None:
         return
     last_bytes = 0
     last_time = time.time()
+    with console.status(
+        "[bold]Starting...[/]", spinner="bouncingBar", spinner_style="cyan"
+    ) as status:
+        while not r.ready:
+            if e.is_set():
+                return
+            sleep(0.2)
     with Progress(
         TaskProgressColumn(),
         BarColumn(style="grey37", complete_style="bold green", bar_width=40),
@@ -61,7 +76,7 @@ def get_progress(e: Event, r: Any, total: int = 100) -> None:
             progress.update(task, completed=r.value, rate=rate)
             last_bytes = r.value
             last_time = now
-            sleep(0.1)
+            sleep(0.25)
         progress.update(task, completed=total, refresh=True)
 
 

@@ -20,6 +20,7 @@ from .utils.generator import Gen, Node, ExprError
 @dataclass
 class Progress:
     value: float = 0
+    ready: bool = True
 
 
 def generate(
@@ -30,6 +31,7 @@ def generate(
     filename: str | None = None,
     quiet_mode: bool = False,
     sep: str = "\n",
+    wrange: tuple[str | None, str | None] = (None, None),
 ) -> int:
     """Function to generate words"""
     progress = Progress()
@@ -42,23 +44,41 @@ def generate(
 
     # uses sys.stdout if filename = None
     with r_open(filename, "a", encoding="utf-8", buffering=buffering) as fp:
-        if fp:
-            # ignore progress bar to stdout
-            if show_progress_bar:
-                thread.start()
-            start_time = perf_counter()
-            try:
-                for _ in generator.generate(nodes):
-                    progress.value += fp.write(_ + sep)
-            except KeyboardInterrupt:
-                if show_progress_bar:
-                    event.set()
-                    thread.join()
-                log.info("Goodbye!")
-                return 0
-            elapsed = perf_counter() - start_time
-        else:
+        if not fp:
             return 1
+        start, end = wrange
+        ready = start is None
+        progress.ready = ready
+        # ignore progress bar to stdout
+        if show_progress_bar:
+            thread.start()
+        start_time = perf_counter()
+
+        def _stop_event() -> None:
+            if show_progress_bar:
+                event.set()
+                thread.join()
+
+        try:
+            for _ in generator.generate(nodes, start_from=start):
+                if not progress.ready:
+                    progress.ready = True
+                progress.value += fp.write(_ + sep)
+                if end:
+                    if end == _:
+                        _stop_event()
+                        log.warning(f"Wordlist was stopped at '{end}' (--to).")
+                        return 0
+        except KeyboardInterrupt:
+            _stop_event()
+            log.warning("Generation stopped with keyboard interrupt!")
+            return 0
+        if not progress.ready:
+            _stop_event()
+            log.warning(f"Word '{start}' not found in wordlist generation.")
+            return 0
+        elapsed = perf_counter() - start_time
+        _stop_event()
 
     if show_progress_bar:
         thread.join()
@@ -135,6 +155,9 @@ def main() -> int:
     generator = Gen()
 
     if args.expr_file is not None:
+        if args.start or args.end:
+            log.error("--from/--to are not supported with expression files.")
+            return 1
         with r_open(args.expr_file, "r", encoding="utf-8") as fp:
             if fp is None:
                 return 1
@@ -143,13 +166,14 @@ def main() -> int:
             files: list[str] = []
             log.info(f'Opening file "{args.expr_file}" with {len(lines)} lines.')
             for i, expression in enumerate(lines):
-                expression = expression.split("#")[0].strip()  # ignore comments
                 if not expression:
                     continue
                 for alias in aliases:
                     expression = re.sub(r"(?<!\\)\$" + alias[0], alias[1], expression)
                 fields = expression.split(" ")
-                if expression.startswith(r"%alias "):
+                if fields[0] == "#":  # ignore comments
+                    continue
+                if fields[0] == r"%alias":
                     if len(fields) < 3:
                         log.error(
                             r"Invalid File: '%alias' keyword requires 2 arguments."
@@ -159,7 +183,7 @@ def main() -> int:
                     alias_value = " ".join(fields[2:])
                     aliases.append((alias, alias_value))
                     continue
-                elif expression.startswith(r"%file "):
+                elif fields[0] == r"%file":
                     if len(fields) < 2:
                         log.error(
                             r"Invalid File: '%file' keyword requires 1 arguments."
@@ -193,6 +217,9 @@ def main() -> int:
                     return c
         return 0
 
+    if args.end is not None:
+        log.warning("Using --to: wordlist generation should stop before completion.")
+
     expression, files = f_expression(expression, args.files)
 
     try:
@@ -200,7 +227,7 @@ def main() -> int:
         nodes = generator.parse(tokens, files=(files or None))
         s_bytes, s_words = generator.stats(nodes, sep_len=len(args.separator))
     except ExprError as e:
-        log.error(f"expression error: {e}")
+        log.error(f"Expression Error: {e}")
         return 1
 
     log.info(f"Fuse will generate {s_words} words ({format_size(s_bytes)}).")
@@ -224,4 +251,5 @@ def main() -> int:
         buffering=buffer,
         quiet_mode=args.quiet,
         sep=args.separator,
+        wrange=(args.start, args.end),
     )
