@@ -26,7 +26,7 @@ class Progress:
 def generate(
     generator: Gen,
     nodes: list[Node],
-    total_bytes: int,
+    stats: tuple[int, int],
     buffering: int = 0,
     filename: str | None = None,
     quiet_mode: bool = False,
@@ -35,6 +35,7 @@ def generate(
 ) -> int:
     """Function to generate words"""
     progress = Progress()
+    total_bytes, total_words = stats
 
     event = threading.Event()
     thread = threading.Thread(
@@ -84,7 +85,7 @@ def generate(
         thread.join()
 
     log.info(
-        f"Complete word generation in {format_time(elapsed)} ({int(total_bytes/elapsed)} W/s)."
+        f"Complete word generation in {format_time(elapsed)} ({int(total_words/elapsed)} W/s)."
     )
 
     return 0
@@ -207,7 +208,7 @@ def main() -> int:
                 c = generate(
                     generator,
                     nodes,
-                    total_bytes=s_bytes,
+                    (s_bytes, s_words),
                     filename=args.output,
                     buffering=buffer,
                     quiet_mode=args.quiet,
@@ -246,7 +247,7 @@ def main() -> int:
     return generate(
         generator,
         nodes,
-        s_bytes,
+        (s_bytes, s_words),
         filename=args.output,
         buffering=buffer,
         quiet_mode=args.quiet,
