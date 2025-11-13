@@ -7,8 +7,7 @@
   <a href="#installation">Installation</a>
   &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;
   <a href="#usage">Usage</a>
-  &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;
-  <a href="#contributing">Contributing</a>
+  &nbsp;&nbsp;&nbsp;
 </p>
 
 <p align="center">
