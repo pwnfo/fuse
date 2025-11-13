@@ -35,7 +35,7 @@ Core features:
 
 | Method                           | Notes                                                                     |
 | -------------------------------- | ------------------------------------------------------------------------- |
-| `pipx install fuse-cli`          | `pip` can be used instead of `pipx`                                       |
+| `pipx install fuse-tool`          | `pip` can be used instead of `pipx`                                       |
 | Clone and install from GitHub    | `git clone https://github.com/pwnfo/fuse.git && cd fuse && pip install .` |
 
 ---

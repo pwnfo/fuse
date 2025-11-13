@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "fuse-cli"
+name = "fuse-tool"
 version = "0.1.0"
 description = "Fuse: Customizable wordlist generator with advanced pattern."
 authors = ["Ryan R. <dev.richarlison@proton.me>"]
