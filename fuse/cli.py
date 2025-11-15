@@ -86,7 +86,7 @@ def generate(
         thread.join()
 
     log.info(
-        f"✨ Complete word generation in {format_time(elapsed)} ({int(total_words/elapsed)} W/s)."
+        f"✨ Complete word generation in {format_time(elapsed)} ({int(total_words/elapsed):,} W/s)."
     )
 
     return 0
@@ -204,7 +204,7 @@ def main() -> int:
                     log.error(e)
                     return 1
                 log.info(
-                    f"Generating {s_words} words ({format_size(s_bytes)}) for L{i+1}..."
+                    f"Generating {s_words:,} words ({format_size(s_bytes)}) for L{i+1}..."
                 )
                 c = generate(
                     generator,
@@ -233,7 +233,7 @@ def main() -> int:
         return 1
 
     log.info(f"Fuse Version @ {__version__}")
-    log.info(f"Fuse will generate {s_words} words ({format_size(s_bytes)}).")
+    log.info(f"Fuse will generate {s_words:,} words ({format_size(s_bytes)}).")
 
     if not args.quiet:
         while True:
