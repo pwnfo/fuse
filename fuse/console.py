@@ -48,7 +48,7 @@ def get_progress(e: Event, r: Any, total: int = 100) -> None:
         sys.stdout.write(message)
         sys.stdout.flush()
 
-        sleep(1)
+        sleep(0.5)
 
     sys.stdout.write("\033[?25h")
     sys.stdout.write(" " * len(message) + "\r")
