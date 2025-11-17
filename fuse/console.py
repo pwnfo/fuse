@@ -17,17 +17,22 @@ def calc_rate(prev_bytes: int, curr_bytes: int, delta_time: float) -> str:
 
 def get_progress(e: Event, r: Any, total: int = 100) -> None:
     """Show progress bar"""
-    x = 0
+    dots = 0
+    sys.stdout.write("\033[?25l")
+
     while not r.ready:
         if e.is_set():
             return
-        ret = "." * ((x % 3) + 1)
-        sys.stdout.write(f"Starting{ret}   \r")
-        x += 1
+
+        ret = "." * ((dots % 3) + 1)
+        message = f"IDLE :: Searching for '{r.word}'{ret}    \r"
+        sys.stdout.write(message)
+        dots += 1
         sleep(0.5)
+
     prev_bytes = r.value
     prev_time = time.time()
-    sys.stdout.write("\033[?25l")
+
     while r.value < total:
         if e.is_set():
             break
@@ -44,6 +49,7 @@ def get_progress(e: Event, r: Any, total: int = 100) -> None:
         sys.stdout.flush()
 
         sleep(1)
+
     sys.stdout.write("\033[?25h")
     sys.stdout.write(" " * len(message) + "\r")
     sys.stdout.flush()

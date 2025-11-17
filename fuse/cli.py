@@ -1,240 +1,248 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import threading
-import sys
 import re
+import sys
+import threading
 
-from time import perf_counter
-from logging import ERROR
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
+from logging import ERROR
+from time import perf_counter
+from typing import List, Tuple, Optional
 
 from fuse import __version__
-from fuse.logger import log
-from fuse.console import get_progress
 from fuse.args import create_parser
-
+from fuse.console import get_progress
+from fuse.logger import log
 from fuse.utils.files import r_open
 from fuse.utils.formatters import format_size, format_time, parse_size
-from fuse.utils.generator import Gen, Node, ExprError
+from fuse.utils.generator import ExprError, Node, WordlistGenerator
 
 
 @dataclass
 class Progress:
+    word: str = ""
     value: float = 0
     ready: bool = True
 
 
 def generate(
-    generator: Gen,
-    nodes: list[Node],
-    stats: tuple[int, int],
+    generator: WordlistGenerator,
+    nodes: List[Node],
+    stats: Tuple[int, int],
     buffering: int = 0,
-    filename: str | None = None,
+    filename: Optional[str] = None,
     quiet_mode: bool = False,
     sep: str = "\n",
-    wrange: tuple[str | None, str | None] = (None, None),
+    wrange: Tuple[Optional[str], Optional[str]] = (None, None),
 ) -> int:
-    """Function to generate words"""
     progress = Progress()
     total_bytes, total_words = stats
 
+    # thread for progress bar
     event = threading.Event()
     thread = threading.Thread(
         target=get_progress, args=(event, progress), kwargs={"total": total_bytes}
     )
     show_progress_bar = (filename is not None) and (not quiet_mode)
 
-    # uses sys.stdout if filename = None
+    # output file or stdout
     with r_open(filename, "a", encoding="utf-8", buffering=buffering) as fp:
         if not fp:
             return 1
-        start, end = wrange
-        ready = start is None
-        progress.ready = ready
-        # ignore progress bar to stdout
+
+        start_token, end_token = wrange
+        progress.ready = start_token is None
+
         if show_progress_bar:
             thread.start()
-        start_time = perf_counter()
-        now_msg = datetime.now()
 
-        def _stop_event() -> None:
-            if show_progress_bar:
+        start_time = perf_counter()
+
+        # stops progress thread
+        def stop_progress() -> None:
+            if show_progress_bar and not event.is_set():
                 event.set()
                 thread.join()
 
         log.info(
-            now_msg.strftime(
-                f"Starting wordlist generation at %H:%M:%S on %a %b %d %Y."
+            datetime.now().strftime(
+                "Starting wordlist generation at %H:%M:%S on %a %b %d %Y."
             )
         )
 
+        if start_token:
+            progress.word = start_token
+
         try:
-            for _ in generator.generate(nodes, start_from=start):
+            for token in generator.generate(nodes, start_from=start_token):
                 if not progress.ready:
                     progress.ready = True
-                progress.value += fp.write(_ + sep)
-                if end:
-                    if end == _:
-                        _stop_event()
-                        log.warning(f"Wordlist was stopped at '{end}' (--to).")
-                        return 0
-        except KeyboardInterrupt:
-            _stop_event()
-            log.warning("Generation stopped with keyboard interrupt!")
-            return 0
-        if not progress.ready:
-            _stop_event()
-            log.warning(f"Word '{start}' not found in wordlist generation.")
-            return 0
-        elapsed = perf_counter() - start_time
-        _stop_event()
 
-    if show_progress_bar:
+                progress.value += fp.write(token + sep)
+
+                # stop when reaching --to
+                if end_token and end_token == token:
+                    stop_progress()
+                    log.warning(f"Wordlist was stopped at '{end_token}' (--to).")
+                    return 0
+
+        except KeyboardInterrupt:
+            stop_progress()
+            log.warning("Generation stopped with keyboard interrupt!")
+            return 1
+        except Exception:
+            stop_progress()
+            raise
+
+        # start not found
+        if not progress.ready:
+            stop_progress()
+            log.warning(f"Word '{start_token}' not found in wordlist generation.")
+            return 1
+
+        elapsed = perf_counter() - start_time
+        stop_progress()
+
+    if show_progress_bar and thread.is_alive():
         thread.join()
 
-    log.info(
-        f"✨ Complete word generation in {format_time(elapsed)} ({int(total_words/elapsed):,} W/s)."
-    )
+    speed = int(total_words / elapsed) if elapsed > 0 else 0
+    log.info(f"✨ Complete word generation in {format_time(elapsed)} ({speed:,} W/s).")
 
     return 0
 
 
-def f_expression(expression: str, files: list) -> tuple[str, list]:
-    """Formats string to allow inline expressions and files"""
-    n = 0
-    i_count = 0
+def f_expression(expression: str, files: List[str]) -> Tuple[str, List[str]]:
+    n_files = 0
+    files_out: List[str] = []
 
-    def i_replace(m: re.Match) -> str:
-        nonlocal i_count
-
-        i_count += 1
-        if i_count == n:
-            return i_str
-        return m.group(0)
-
-    i = 0
-    files_copy = files.copy()
-
+    # escapes @
     def escape_expr(m: re.Match) -> str:
         b = m.group(1)
-        if len(b) % 2 == 0:
-            return b + r"\@"
-        else:
-            return m.group(0)
+        return b + r"\@" if len(b) % 2 == 0 else m.group(0)
 
     expression = re.sub(r"(\\*)@", escape_expr, expression)
 
-    for file in files:
-        if file.startswith("//"):
-            i_str = file.replace("//", "", count=1)
-            n += 1
-            expression = re.sub(r"(?<!\\)\^", i_replace, expression, count=1)
-            files_copy.pop(i)
-            i -= 1
+    for file_path in files:
+        if file_path.startswith("//"):
+            inline = file_path.replace("//", "", 1)
+            expression = re.sub(r"(?<!\\)\^", lambda m: inline, expression, count=1)
+            n_files += 1
         else:
             expression = re.sub(r"(?<!\\)\^", "@", expression, count=1)
-        i += 1
+            files_out.append(file_path)
 
-    return expression, files_copy
+    return expression, files_out
 
 
 def main() -> int:
     parser = create_parser()
     args = parser.parse_args()
 
-    if (args.expression is None) and (args.expr_file is None):
+    if args.expression is None and args.expr_file is None:
         parser.print_help(sys.stderr)
         return 1
 
     if args.quiet:
         log.setLevel(ERROR)
 
+    buffer_size = -1
     if args.buffer.upper() != "AUTO":
         try:
-            buffer = parse_size(args.buffer)
-            if buffer <= 0:
+            buffer_size = parse_size(args.buffer)
+            if buffer_size <= 0:
                 raise ValueError("the value cannot be <= 0")
         except ValueError as e:
             log.error(f"invalid buffer size: {e}")
             return 1
-    else:
-        buffer = -1
 
-    expression = args.expression
-    generator = Gen()
+    generator = WordlistGenerator()
 
+    # file mode (-f/--file)
     if args.expr_file is not None:
         if args.start or args.end:
             log.error("--from/--to are not supported with expression files.")
             return 1
+
         with r_open(args.expr_file, "r", encoding="utf-8") as fp:
             if fp is None:
                 return 1
-            lines = [_.strip() for _ in fp]
-            aliases: list[tuple] = []
-            files: list[str] = []
+
+            lines = [line.strip() for line in fp if line.strip()]
+            aliases: List[Tuple[str, str]] = []
+            current_files: List[str] = []
+
             log.info(f'Opening file "{args.expr_file}" with {len(lines)} lines.')
-            for i, expression in enumerate(lines):
-                if not expression:
+
+            for i, line in enumerate(lines):
+                # apply aliases
+                for alias_key, alias_val in aliases:
+                    line = re.sub(r"(?<!\\)\$" + re.escape(alias_key), alias_val, line)
+
+                fields = line.split(" ")
+                keyword = fields[0]
+
+                # apply comments
+                if keyword == "#":
                     continue
-                for alias in aliases:
-                    expression = re.sub(r"(?<!\\)\$" + alias[0], alias[1], expression)
-                fields = expression.split(" ")
-                if fields[0] == "#":  # ignore comments
-                    continue
-                if fields[0] == r"%alias":
+
+                # alias definition
+                if keyword == r"%alias":
                     if len(fields) < 3:
                         log.error(
-                            r"Invalid File: '%alias' keyword requires 2 arguments."
+                            r"invalid file: '%alias' keyword requires 2 arguments."
                         )
                         return 1
-                    alias = fields[1].strip()
-                    alias_value = " ".join(fields[2:])
-                    aliases.append((alias, alias_value))
+                    aliases.append((fields[1].strip(), " ".join(fields[2:])))
                     continue
-                elif fields[0] == r"%file":
+
+                # file include
+                if keyword == r"%file":
                     if len(fields) < 2:
                         log.error(
-                            r"Invalid File: '%file' keyword requires 1 arguments."
+                            r"invalid file: '%file' keyword requires 1 arguments."
                         )
                         return 1
-                    files.append(" ".join(fields[1:]).strip())
+                    current_files.append(" ".join(fields[1:]).strip())
                     continue
+
                 try:
-                    tokens = generator.tokenize(expression)
-                    nodes = generator.parse(tokens, files=(files or None))
+                    tokens = generator.tokenize(line)
+                    nodes = generator.parse(tokens, files=(current_files or None))
                     s_bytes, s_words = generator.stats(
                         nodes, sep_len=len(args.separator)
                     )
-                    files = []
+                    current_files = []  # reset files after usage
                 except ExprError as e:
                     log.error(e)
                     return 1
+
                 log.info(
                     f"Generating {s_words:,} words ({format_size(s_bytes)}) for L{i+1}..."
                 )
-                c = generate(
+
+                ret_code = generate(
                     generator,
                     nodes,
                     (s_bytes, s_words),
                     filename=args.output,
-                    buffering=buffer,
+                    buffering=buffer_size,
                     quiet_mode=args.quiet,
                     sep=args.separator,
                 )
-                if c != 0:
-                    return c
+                if ret_code != 0:
+                    return ret_code
         return 0
 
     if args.end is not None:
         log.warning("Using --to: wordlist generation should stop before completion.")
 
-    expression, files = f_expression(expression, args.files)
+    expression, proc_files = f_expression(args.expression, args.files)
 
     try:
         tokens = generator.tokenize(expression)
-        nodes = generator.parse(tokens, files=(files or None))
+        nodes = generator.parse(tokens, files=(proc_files or None))
         s_bytes, s_words = generator.stats(nodes, sep_len=len(args.separator))
     except ExprError as e:
         log.error(e)
@@ -246,26 +254,24 @@ def main() -> int:
     if not args.quiet:
         while True:
             try:
-                r = input("[Y/n] Continue? ").upper()
+                r = input("[Y/n] Continue? ").strip().upper()
             except KeyboardInterrupt:
                 return 0
 
             if not r or r == "Y":
                 break
-            elif r == "N":
+            if r == "N":
                 return 0
-            else:
-                log.info('Please answer "Y" or "N"...')
+            log.info('Please answer "Y" or "N"...')
 
-    sys.stdout.write("\n")
-    sys.stdout.flush()
+    log.info("\n")
 
     return generate(
         generator,
         nodes,
         (s_bytes, s_words),
         filename=args.output,
-        buffering=buffer,
+        buffering=buffer_size,
         quiet_mode=args.quiet,
         sep=args.separator,
         wrange=(args.start, args.end),

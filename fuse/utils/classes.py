@@ -18,18 +18,14 @@ def pattern_repl(pattern: str, wc: str = "/") -> str:
     """Replaces the word classes of an `pattern`"""
 
     def i_replace(m: re.Match) -> str:
-        """REGEX function
-        "[/d]" -> "[0123456789]"
-        "/d"   -> "[0123456789]"
-        """
         expr = m.group(0)
         if expr.startswith("["):
             return expr.replace(i_old, i_new)
         return expr.replace(i_old, f"[{i_new}]")
 
-    for _ in char_classes:
-        i_old = wc + _[0]
-        i_new = _[1]
+    for char_class in char_classes:
+        i_old = wc + char_class[0]
+        i_new = char_class[1]
         pattern = re.sub(r"\[[^\]]*\]|[^[]+", i_replace, pattern)
 
     return pattern

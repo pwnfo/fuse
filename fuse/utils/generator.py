@@ -1,8 +1,7 @@
 import re
-import sys
 
 from itertools import product
-from typing import Generator, Any, List, Never
+from typing import Generator, Any, List
 
 from fuse.utils.classes import pattern_repl
 from fuse.utils.files import r_open
@@ -16,8 +15,10 @@ class ExprError(Exception):
 
 
 class Node:
-    def __init__(self, base: str | list, min_rep: int = 1, max_rep: int = 1) -> None:
-        self.base = base
+    def __init__(
+        self, base: str | list[str], min_rep: int = 1, max_rep: int = 1
+    ) -> None:
+        self.base = base if isinstance(base, list) else [base]
         self.min_rep = min_rep
         self.max_rep = max_rep
 
@@ -25,63 +26,54 @@ class Node:
         return f"<Node base={self.base!r} {{{self.min_rep},{self.max_rep}}}>"
 
     def expand(self) -> Generator[str, None, None]:
-        if isinstance(self.base, list):
-            choices = self.base
-        else:
-            choices = [self.base]
+        if self.min_rep == 0 and self.max_rep == 0:
+            yield ""
+            return
 
         for k in range(self.min_rep, self.max_rep + 1):
             if k == 0:
                 yield ""
             else:
-                for tup in product(choices, repeat=k):
+                for tup in product(self.base, repeat=k):
                     yield "".join(tup)
 
 
 class FileNode(Node):
+    def __init__(self, files: list[str], min_rep: int = 1, max_rep: int = 1) -> None:
+        super().__init__(files, min_rep, max_rep)
+        self._cached_lines: list[str] | None = None
+
     def __repr__(self) -> str:
         return f"<FileNode files={self.base!r} {{{self.min_rep},{self.max_rep}}}>"
 
-    def _collect_lines(self) -> list[str] | Never:
-        if hasattr(self, "_lines"):
-            self._lines: list[str]
-            return self._lines
+    @property
+    def lines(self) -> list[str]:
+        if self._cached_lines is not None:
+            return self._cached_lines
 
-        lines: list[str] = []
+        lines: Any = []
         for path in self.base:
-            with r_open(path, "r", encoding="utf-8", errors="ignore") as fp:
-                if fp:
-                    for ln in fp:
-                        ln = ln.rstrip("\n\r")
-                        lines.append(ln)
-                else:
-                    sys.exit(1)
-        if not lines:
-            raise ExprError("file node produced no lines (empty files?).")
+            try:
+                with r_open(path, "r", encoding="utf-8", errors="ignore") as fp:
+                    if not fp:
+                        raise IOError
+                    lines.extend(ln.rstrip("\n\r") for ln in fp)
+            except (IOError, OSError):
+                raise ExprError(f"failed to open or read file: {path}")
 
-        self._lines = lines
+        if not lines:
+            raise ExprError(f"file node produced no lines: {self.base}")
+
+        self._cached_lines = lines
         return lines
 
-    def stats_info(self) -> tuple[int, int] | Never:
-        k = 0
-        sum_len = 0
-        for path in self.base:
-            with r_open(path, "r", encoding="utf-8", errors="ignore") as fp:
-                if fp:
-                    for ln in fp:
-                        ln = ln.rstrip("\n\r")
-                        k += 1
-                        sum_len += len(ln.encode("utf-8"))
-                else:
-                    sys.exit(1)
-        if k == 0:
-            raise ExprError("file node produced no lines (empty files?).")
-        return k, sum_len
+    def stats_info(self) -> tuple[int, int]:
+        data = self.lines
+        total_len = sum(len(line.encode("utf-8")) for line in data)
+        return len(data), total_len
 
     def expand(self) -> Generator[str, None, None]:
-        choices = self._collect_lines()
-        k = len(choices)
-
+        choices = self.lines
         for r in range(self.min_rep, self.max_rep + 1):
             if r == 0:
                 yield ""
@@ -90,8 +82,87 @@ class FileNode(Node):
                     yield "".join(tup)
 
 
-class Gen:
+class WordlistGenerator:
     BRACES_RE = re.compile(r"\{(\d+)(?:\s*,\s*(\d+))?\}")
+    RANGE_RE = re.compile(r"\s*([0-9]+)\s*-\s*([0-9]+)\s*(?::\s*([+-]?\d+)\s*)?$")
+
+    def _parse_range(self, pattern: str, start_idx: int) -> tuple[list[str], int]:
+        match = re.search(r"(?<!\\)\]", pattern[start_idx:])
+        if match is None:
+            raise ExprError("unclosed range: missing ']'.", start_idx - 2)
+
+        end_idx = start_idx + match.start()
+        inner = pattern[start_idx:end_idx]
+
+        m = self.RANGE_RE.match(inner)
+        if not m:
+            raise ExprError(
+                "invalid range: expected '#[START-END[:STEP]]'.", start_idx - 2
+            )
+
+        r_start, r_end = int(m.group(1)), int(m.group(2))
+        step_str = m.group(3)
+        step = int(step_str) if step_str else (1 if r_start <= r_end else -1)
+
+        if step == 0:
+            raise ExprError("invalid range: STEP cannot be zero.", start_idx - 2)
+        if r_start < 0 or r_end < 0:
+            raise ExprError(
+                "invalid range: START/END must be non-negative.", start_idx - 2
+            )
+        if (step > 0 and r_start > r_end) or (step < 0 and r_start < r_end):
+            raise ExprError("invalid range sequence.", start_idx - 2)
+
+        rng = range(r_start, r_end + 1 if step > 0 else r_end - 1, step)
+        choices = [str(x) for x in rng]
+
+        if not choices:
+            raise ExprError("invalid range: produced no values.", start_idx - 2)
+
+        return choices, end_idx + 1
+
+    def _parse_class(
+        self, pattern: str, start_idx: int, literal_mode: bool
+    ) -> tuple[list[str], int]:
+        closer = ")" if literal_mode else "]"
+        match = re.search(rf"(?<!\\)\{closer}", pattern[start_idx:])
+
+        if match is None:
+            raise ExprError(f"unclosed class: missing '{closer}'.", start_idx - 1)
+
+        end_idx = start_idx + match.start()
+        inner = pattern[start_idx:end_idx]
+
+        if not inner:
+            raise ExprError("empty class is not allowed.", start_idx - 1)
+
+        if literal_mode:
+            return [inner], end_idx + 1
+
+        if "|" not in inner:
+            return list(inner), end_idx + 1
+
+        segments = []
+        buf = []
+        escape = False
+        for ch in inner:
+            if escape:
+                buf.append(ch)
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == "|":
+                segments.append("".join(buf))
+                buf = []
+            else:
+                buf.append(ch)
+        segments.append("".join(buf))
+
+        choices = [s.strip() for s in segments if s.strip()]
+        if not choices:
+            raise ExprError("invalid character class contents.", start_idx - 1)
+
+        return choices, end_idx + 1
 
     def tokenize(self, pattern: str) -> list[tuple[str, Any]]:
         pattern = pattern_repl(pattern)
@@ -100,300 +171,174 @@ class Gen:
 
         while i < n:
             c = pattern[i]
+
             if c == "\\":
-                if i + 1 < n:
-                    tokens.append(("LIT", pattern[i + 1]))
-                    i += 2
-                else:
-                    raise ExprError(
-                        "invalid escape: pattern ends with a single backslash '\\'.", i
-                    )
-            elif c == "#":
+                if i + 1 >= n:
+                    raise ExprError("invalid escape: ends with backslash.", i)
+                tokens.append(("LIT", pattern[i + 1]))
+                i += 2
+                continue
+
+            if c == "#":
                 if i + 1 < n and pattern[i + 1] == "[":
-                    match = re.search(r"(?<!\\)\]", pattern[i + 2 :])
-                    if match is None:
-                        raise ExprError("unclosed range: missing ']'.", i)
-                    j = i + 2 + match.start()
-                    inner = pattern[i + 2 : j]
-                    m = re.match(
-                        r"\s*([0-9]+)\s*-\s*([0-9]+)\s*(?::\s*([+-]?\d+)\s*)?$", inner
-                    )
-                    if not m:
-                        raise ExprError(
-                            "invalid range: expected '#[START-END[:STEP]]'.", i
-                        )
-                    start = int(m.group(1))
-                    end = int(m.group(2))
-                    step_str = m.group(3)
-                    if step_str is None:
-                        step = 1 if start <= end else -1
-                    else:
-                        step = int(step_str)
-                    if step == 0:
-                        raise ExprError("invalid range: STEP cannot be zero.", i)
-                    if start < 0 or end < 0:
-                        raise ExprError(
-                            "invalid range: START and END must be non-negative integers.",
-                            i,
-                        )
-                    if step > 0 and start > end:
-                        raise ExprError(
-                            "invalid range: START greater than END for positive STEP.",
-                            i,
-                        )
-                    if step < 0 and start < end:
-                        raise ExprError(
-                            "invalid range: START less than END for negative STEP.", i
-                        )
-                    if step > 0:
-                        rng = range(start, end + 1, step)
-                    else:
-                        rng = range(start, end - 1, step)
-                    choices = [str(x) for x in rng]
-                    if not choices:
-                        raise ExprError("invalid range: produced no values.", i)
+                    choices, new_i = self._parse_range(pattern, i + 2)
                     tokens.append(("RANGE", choices))
-                    i = j + 1
+                    i = new_i
                 else:
                     tokens.append(("LIT", "#"))
                     i += 1
-            elif c == "(":
-                match = re.search(r"(?<!\\)\]", pattern[i + 1 :])
-                if match is None:
-                    raise ExprError("unclosed literal class: missing ')'.", i)
-                j = i + 1 + match.start()
-                inner = pattern[i + 1 : j]
-                if inner == "":
-                    raise ExprError("empty literal class '()' is not allowed.", i)
-                tokens.append(("CLASS", [inner]))
-                i = j + 1
-            elif c == "[":
-                match = re.search(r"(?<!\\)\]", pattern[i + 1 :])
-                if match is None:
-                    raise ExprError("unclosed character class: missing ']'.", i)
-                j = i + 1 + match.start()
-                inner = pattern[i + 1 : j]
-                if inner == "":
-                    raise ExprError("empty character class '[]' is not allowed.", i)
-                if "|" in inner:
-                    segments = []
-                    buf = []
-                    escape = False
-                    for ch in inner:
-                        if escape:
-                            buf.append(ch)
-                            escape = False
-                        elif ch == "\\":
-                            escape = True
-                        elif ch == "|":
-                            segments.append("".join(buf))
-                            buf = []
-                        else:
-                            buf.append(ch)
-                    segments.append("".join(buf))
+                continue
 
-                    segments = [s.strip() for s in segments]
-                    segments = [s for s in segments if s != ""]
+            if c == "(":
+                choices, new_i = self._parse_class(pattern, i + 1, literal_mode=True)
+                tokens.append(("CLASS", choices))
+                i = new_i
+                continue
 
-                    if not segments:
-                        raise ExprError(
-                            "invalid character class contents inside [...].", i
-                        )
+            if c == "[":
+                choices, new_i = self._parse_class(pattern, i + 1, literal_mode=False)
+                tokens.append(("CLASS", choices))
+                i = new_i
+                continue
 
-                    if len(segments) > 1:
-                        choices = segments
-                    else:
-                        choices = [segments[0]]
-
-                    tokens.append(("CLASS", choices))
-                    i = j + 1
-                else:
-                    tokens.append(("CLASS", list(inner)))
-                    i = j + 1
-            elif c == "?":
+            if c == "?":
                 tokens.append(("QMARK", None))
                 i += 1
-            elif c == "@":
+                continue
+
+            if c == "@":
                 tokens.append(("FILE", None))
                 i += 1
-            elif c == "{":
+                continue
+
+            if c == "{":
                 m = self.BRACES_RE.match(pattern[i:])
-                if not m:
-                    raise ExprError(
-                        "invalid repetition syntax: expected '{R}' or '{MIN, MAX}'.", i
-                    )
-                a = int(m.group(1))
-                b = m.group(2)
-                if b is None:
-                    tokens.append(("BRACES", (a, a)))
+                if m:
+                    a = int(m.group(1))
+                    b = int(m.group(2)) if m.group(2) is not None else a
+                    if a > b:
+                        raise ExprError("invalid repetition: MIN > MAX.", i)
+                    tokens.append(("BRACES", (a, b)))
+                    i += m.end()
+                    continue
                 else:
-                    b_int = int(b)
-                    if a > b_int:
-                        raise ExprError(
-                            "invalid repetition range: MIN cannot be greater than MAX in '{MIN, MAX}'.",
-                            i,
-                        )
-                    tokens.append(("BRACES", (a, b_int)))
-                i += m.end()
-            else:
-                tokens.append(("LIT", c))
-                i += 1
+                    raise ExprError("invalid repetition syntax.", i)
+
+            tokens.append(("LIT", c))
+            i += 1
+
         return tokens
 
     def parse(
         self, tokens: list[tuple[str, Any]], files: List[str] | None = None
     ) -> list[Node | FileNode]:
-        i = 0
-        L = len(tokens)
-        nodes: list[Node] = []
+        nodes = []
+        file_tokens = [t for t, _ in tokens if t == "FILE"]
+        count_ft = len(file_tokens)
 
-        file_token_count = sum(1 for t, _ in tokens if t == "FILE")
-        file_assignments: List[List[str]] = []
+        if count_ft > 0:
+            if not files:
+                raise ExprError("pattern requires files but none provided.")
+            if len(files) < 1:
+                raise ExprError("files list is empty.")
 
-        if file_token_count == 0:
-            file_assignments = []
-        else:
-            if files is None:
-                raise ExprError(
-                    "pattern contains '@' file placeholder but no files were provided.",
-                    i,
-                )
-            if file_token_count == 1:
-                file_assignments = [files]
+            if count_ft == 1:
+                file_groups = [files]
             else:
-                if len(files) < file_token_count:
+                if len(files) < count_ft:
                     raise ExprError(
-                        f"pattern requires {file_token_count} file(s) (one per '@'), but only {len(files)} provided.",
-                        i,
+                        f"pattern requires {count_ft} files, {len(files)} provided."
                     )
-                file_assignments = [[f] for f in files[:file_token_count]]
+                file_groups = [[f] for f in files[:count_ft]]
+        else:
+            file_groups = []
 
-        current_file_idx = 0
+        file_idx = 0
+        i, length = 0, len(tokens)
 
-        while i < L:
-            t, val = tokens[i]
-            if t in ("LIT", "CLASS", "RANGE"):
-                base = val
-                min_rep, max_rep = 1, 1
-                if i + 1 < L:
-                    nt, nval = tokens[i + 1]
-                    if nt == "QMARK":
-                        min_rep, max_rep = 0, 1
-                        i += 1
-                    elif nt == "BRACES":
-                        min_rep, max_rep = nval
-                        i += 1
-                nodes.append(Node(base, min_rep, max_rep))
-            elif t == "FILE":
-                if not file_assignments:
-                    raise ExprError("no files assigned for '@' token", i)
-                paths = file_assignments[current_file_idx]
-                current_file_idx += 1
-                min_rep, max_rep = 1, 1
-                if i + 1 < L:
-                    nt, nval = tokens[i + 1]
-                    if nt == "QMARK":
-                        min_rep, max_rep = 0, 1
-                        i += 1
-                    elif nt == "BRACES":
-                        min_rep, max_rep = nval
-                        i += 1
-                nodes.append(FileNode(paths, min_rep, max_rep))
+        while i < length:
+            kind, val = tokens[i]
+            min_rep, max_rep = 1, 1
+
+            if i + 1 < length:
+                next_k, next_v = tokens[i + 1]
+                if next_k == "QMARK":
+                    min_rep, max_rep = 0, 1
+                    i += 1
+                elif next_k == "BRACES":
+                    min_rep, max_rep = next_v
+                    i += 1
+
+            if kind in ("LIT", "CLASS", "RANGE"):
+                nodes.append(Node(val, min_rep, max_rep))
+            elif kind == "FILE":
+                if file_idx >= len(file_groups):
+                    raise ExprError("insufficient file assignments.")
+                nodes.append(FileNode(file_groups[file_idx], min_rep, max_rep))
+                file_idx += 1
             else:
-                raise ExprError(f"unexpected token during parsing: {t!r}.", i)
+                raise ExprError(f"unexpected token: {kind}", i)
+
             i += 1
+
         return nodes
 
-    def _combine_recursive(
-        self, nodes: list[Node], idx: int = 0
-    ) -> Generator[str, None, None]:
+    def _combine(self, nodes: list[Node], idx: int) -> Generator[str, None, None]:
         if idx >= len(nodes):
             yield ""
             return
-        first = nodes[idx]
-        for part in first.expand():
-            for suffix in self._combine_recursive(nodes, idx + 1):
+
+        current_node = nodes[idx]
+        for part in current_node.expand():
+            for suffix in self._combine(nodes, idx + 1):
                 yield part + suffix
 
     def generate(
         self, nodes: list[Node | FileNode], start_from: str | None = None
     ) -> Generator[str, None, None]:
-        gen = self._combine_recursive(nodes, 0)
-        if start_from is None:
-            yield from gen
-            return
+        iterator = self._combine(nodes, 0)
 
-        found = False
-        for s in gen:
-            if not found:
-                if s == start_from:
+        if start_from:
+            found = False
+            for item in iterator:
+                if found:
+                    yield item
+                elif item == start_from:
                     found = True
-                    yield s
-                else:
-                    continue
-            else:
-                yield s
+                    yield item
+        else:
+            yield from iterator
 
-    def _stats_from_nodes(
-        self, nodes: list[Node | FileNode], sep_len: int = 1
-    ) -> tuple[int, int]:
+    def stats(self, nodes: list[Node | FileNode], sep_len: int = 1) -> tuple[int, int]:
         total_count = 1
         total_bytes = 0
 
         for node in nodes:
             if isinstance(node, FileNode):
-                k, sum_len_choices = node.stats_info()
-                lens = None
+                k, sum_len = node.stats_info()
             else:
-                base = node.base
-                if isinstance(base, list):
-                    choices = [str(x) for x in base]
-                else:
-                    choices = [str(base)]
+                choices = node.base
                 k = len(choices)
-                lens = [len(s.encode("utf-8")) for s in choices]
-                sum_len_choices = sum(lens)
-
-            min_r = node.min_rep
-            max_r = node.max_rep
+                sum_len = sum(len(str(s).encode("utf-8")) for s in choices)
 
             node_count = 0
             node_bytes = 0
 
-            for r in range(min_r, max_r + 1):
+            for r in range(node.min_rep, node.max_rep + 1):
                 if r == 0:
-                    count_r = 1
-                    bytes_r = 0
+                    term_count = 1
+                    term_bytes = 0
                 else:
-                    count_r = pow(k, r)
-                    bytes_r = r * pow(k, r - 1) * sum_len_choices
+                    term_count = k**r
+                    term_bytes = r * (k ** (r - 1)) * sum_len
 
-                node_count += count_r
-                node_bytes += bytes_r
+                node_count += term_count
+                node_bytes += term_bytes
 
-            new_count = total_count * node_count
-            new_bytes = total_bytes * node_count + node_bytes * total_count
+            new_total_count = total_count * node_count
+            new_total_bytes = (total_bytes * node_count) + (node_bytes * total_count)
 
-            total_count, total_bytes = new_count, new_bytes
+            total_count = new_total_count
+            total_bytes = new_total_bytes
 
         return int(total_bytes + (sep_len * total_count)), int(total_count)
-
-    def stats(self, nodes: list[Node], sep_len: int = 1) -> tuple[int, int]:
-        return self._stats_from_nodes(nodes, sep_len=sep_len)
-
-    def _node_count(self, node: Node | FileNode) -> int:
-        if isinstance(node, FileNode):
-            choices = node._collect_lines()
-            k = len(choices)
-        else:
-            base = node.base
-            if isinstance(base, list):
-                choices = [str(x) for x in base]
-            else:
-                choices = [str(base)]
-            k = len(choices)
-
-        total = 0
-        for r in range(node.min_rep, node.max_rep + 1):
-            total += 1 if r == 0 else k**r
-        return total
