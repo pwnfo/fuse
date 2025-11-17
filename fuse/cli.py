@@ -225,17 +225,21 @@ def main() -> int:
     expression, proc_files = f_expression(args.expression, args.files)
 
     try:
-        tokens = generator.tokenize(expression)
-        nodes = generator.parse(tokens, files=(proc_files or None))
-        s_bytes, s_words = generator.stats(
-            nodes, sep_len=len(args.separator), start_from=args.start, end=args.end
-        )
-    except ExprError as e:
-        log.error(e)
-        return 1
+        try:
+            tokens = generator.tokenize(expression)
+            nodes = generator.parse(tokens, files=(proc_files or None))
+            s_bytes, s_words = generator.stats(
+                nodes, sep_len=len(args.separator), start_from=args.start, end=args.end
+            )
+        except ExprError as e:
+            log.error(e)
+            return 1
 
-    log.info(f"Fuse v{__version__}")
-    log.info(f"Fuse will generate {s_words:,} words (~{format_size(s_bytes)}).\n")
+        log.info(f"Fuse v{__version__}")
+        log.info(f"Fuse will generate {s_words:,} words (~{format_size(s_bytes)}).\n")
+    except OverflowError:
+        log.error("Overflow Error. Is the expression correct?")
+        return 1
 
     if not args.quiet:
         try:
@@ -265,5 +269,5 @@ def main() -> int:
         )
     except KeyboardInterrupt:
         log.error("Unexpected keyboard interruption!")
-
+   
     return 1
