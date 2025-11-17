@@ -6,6 +6,7 @@ import re
 
 from time import perf_counter
 from logging import ERROR
+from datetime import datetime
 from dataclasses import dataclass
 
 from fuse import __version__
@@ -55,11 +56,18 @@ def generate(
         if show_progress_bar:
             thread.start()
         start_time = perf_counter()
+        now_msg = datetime.now()
 
         def _stop_event() -> None:
             if show_progress_bar:
                 event.set()
                 thread.join()
+
+        log.info(
+            now_msg.strftime(
+                f"Starting wordlist generation at %H:%M:%S on %a %b %d %Y."
+            )
+        )
 
         try:
             for _ in generator.generate(nodes, start_from=start):
