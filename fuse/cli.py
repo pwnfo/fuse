@@ -6,11 +6,12 @@ import threading
 
 from dataclasses import dataclass
 from datetime import datetime
+from getpass import getpass
 from logging import ERROR
 from time import perf_counter
 from typing import List, Tuple, Optional
-
 from fuse import __version__
+
 from fuse.args import create_parser
 from fuse.console import get_progress
 from fuse.logger import log
@@ -21,9 +22,7 @@ from fuse.utils.generator import ExprError, Node, WordlistGenerator
 
 @dataclass
 class Progress:
-    word: str = ""
     value: float = 0
-    ready: bool = True
 
 
 def generate(
@@ -52,7 +51,6 @@ def generate(
             return 1
 
         start_token, end_token = wrange
-        progress.ready = start_token is None
 
         if show_progress_bar:
             thread.start()
@@ -71,35 +69,22 @@ def generate(
             )
         )
 
-        if start_token:
-            progress.word = start_token
-
         try:
             for token in generator.generate(nodes, start_from=start_token):
-                if not progress.ready:
-                    progress.ready = True
-
                 progress.value += fp.write(token + sep)
 
                 # stop when reaching --to
-                if end_token and end_token == token:
+                if end_token == token:
                     stop_progress()
-                    log.warning(f"Wordlist was stopped at '{end_token}' (--to).")
-                    return 0
-
+                    break
         except KeyboardInterrupt:
             stop_progress()
             log.warning("Generation stopped with keyboard interrupt!")
+
             return 1
         except Exception:
             stop_progress()
             raise
-
-        # start not found
-        if not progress.ready:
-            stop_progress()
-            log.warning(f"Word '{start_token}' not found in wordlist generation.")
-            return 1
 
         elapsed = perf_counter() - start_time
         stop_progress()
@@ -222,10 +207,12 @@ def main() -> int:
                     f"Generating {s_words:,} words ({format_size(s_bytes)}) for L{i+1}..."
                 )
 
+                stats = (s_bytes, s_words)
+
                 ret_code = generate(
                     generator,
                     nodes,
-                    (s_bytes, s_words),
+                    stats,
                     filename=args.output,
                     buffering=buffer_size,
                     quiet_mode=args.quiet,
@@ -235,44 +222,48 @@ def main() -> int:
                     return ret_code
         return 0
 
-    if args.end is not None:
-        log.warning("Using --to: wordlist generation should stop before completion.")
-
     expression, proc_files = f_expression(args.expression, args.files)
 
     try:
         tokens = generator.tokenize(expression)
         nodes = generator.parse(tokens, files=(proc_files or None))
-        s_bytes, s_words = generator.stats(nodes, sep_len=len(args.separator))
+        s_bytes, s_words = generator.stats(
+            nodes, sep_len=len(args.separator), start_from=args.start, end=args.end
+        )
     except ExprError as e:
         log.error(e)
         return 1
 
-    log.info(f"Fuse Version @ {__version__}")
-    log.info(f"Fuse will generate {s_words:,} words ({format_size(s_bytes)}).")
+    log.info(f"Fuse v{__version__}")
+    log.info(f"Fuse will generate {s_words:,} words (~{format_size(s_bytes)}).\n")
 
     if not args.quiet:
-        while True:
-            try:
-                r = input("[Y/n] Continue? ").strip().upper()
-            except KeyboardInterrupt:
-                return 0
+        try:
+            getpass("Press ENTER to continue...")
+        except KeyboardInterrupt:
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            return 0
 
-            if not r or r == "Y":
-                break
-            if r == "N":
-                return 0
-            log.info('Please answer "Y" or "N"...')
+    sys.stdout.write("\033[F")
+    sys.stdout.write("\033[K")
+    sys.stdout.flush()
 
-    log.info("\n")
+    stats = (s_bytes, s_words)
+    wrange = (args.start, args.end)
 
-    return generate(
-        generator,
-        nodes,
-        (s_bytes, s_words),
-        filename=args.output,
-        buffering=buffer_size,
-        quiet_mode=args.quiet,
-        sep=args.separator,
-        wrange=(args.start, args.end),
-    )
+    try:
+        return generate(
+            generator,
+            nodes,
+            stats,
+            filename=args.output,
+            buffering=buffer_size,
+            quiet_mode=args.quiet,
+            sep=args.separator,
+            wrange=wrange,
+        )
+    except KeyboardInterrupt:
+        log.error("Unexpected keyboard interruption!")
+
+    return 1

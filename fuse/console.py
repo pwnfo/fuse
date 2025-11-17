@@ -1,6 +1,5 @@
 import sys
 import time
-
 from threading import Event
 from time import sleep
 from typing import Any
@@ -16,19 +15,11 @@ def calc_rate(prev_bytes: int, curr_bytes: int, delta_time: float) -> str:
 
 
 def get_progress(e: Event, r: Any, total: int = 100) -> None:
-    """Show progress bar"""
-    dots = 0
+    """Show progress bar with ETA"""
+    message = ""
+    start_time = time.time()
+
     sys.stdout.write("\033[?25l")
-
-    while not r.ready:
-        if e.is_set():
-            return
-
-        ret = "." * ((dots % 3) + 1)
-        message = f"IDLE :: Searching for '{r.word}'{ret}    \r"
-        sys.stdout.write(message)
-        dots += 1
-        sleep(0.5)
 
     prev_bytes = r.value
     prev_time = time.time()
@@ -38,16 +29,25 @@ def get_progress(e: Event, r: Any, total: int = 100) -> None:
             break
         curr_bytes = r.value
         curr_time = time.time()
-
-        _ = int((r.value / total) * 100)
+        progress_pct = int((r.value / total) * 100)
 
         delta_time = curr_time - prev_time
         rate = calc_rate(prev_bytes, curr_bytes, delta_time)
 
-        message = f"[{r.value/1024:.0f}/{total/1024:.0f}] KB :: {rate} :: {_}% Generating...\r"
+        elapsed_time = curr_time - start_time
+        avg_rate = r.value / elapsed_time if elapsed_time > 0 else 0
+        remaining_time = (total - r.value) / avg_rate if avg_rate > 0 else 0
+        mins, secs = divmod(int(remaining_time), 60)
+
+        message = (
+            f"Generating {format_size(r.value, d=2)} / {format_size(total, d=2)} "
+            f"[{progress_pct}%] @ {rate} | ETA {mins:02d}:{secs:02d}    \r"
+        )
         sys.stdout.write(message)
         sys.stdout.flush()
 
+        prev_bytes = curr_bytes
+        prev_time = curr_time
         sleep(0.5)
 
     sys.stdout.write("\033[?25h")
