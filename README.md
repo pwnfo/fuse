@@ -45,18 +45,19 @@ Core features:
 ```
 usage: fuse [options] <expression> [<files...>]
 
-Fuse v0.1.0
+Fuse v1.1.1
 
   -h, --help            show this help message and exit
   -v, --version         show version message and exit
   -o, --output <path>   write the wordlist in the file
   -f, --file <path>     files with different expressions
   -q, --quiet           use quiet mode
-  -b, --buffer <bytes>  buffer size in wordlist generation
   -s, --separator <sep>
-                        separator beetwen entries
-  --from <word>         start writing the wordlist with <word>
-  --to <word>           ends writing the wordlist with <word>
+                        separator between entries
+  -b, --buffer <bytes>  buffer size in wordlist generation
+  -F, --filter <regex>  filter generated words using a regex
+  -S, --from <word>     start writing the wordlist with <word>
+  -E, --to <word>       ends writing the wordlist with <word>
 
 Customizable wordlist generator with advanced pattern.
 Developed by Ryan R. <pwnfo@proton.me>
