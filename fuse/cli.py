@@ -9,13 +9,13 @@ from datetime import datetime
 from getpass import getpass
 from logging import ERROR
 from time import perf_counter
-from typing import List, Tuple, Optional
+from pathlib import Path
 from fuse import __version__
 
+from fuse.logger import log
 from fuse.args import create_parser
 from fuse.console import get_progress
-from fuse.logger import log
-from fuse.utils.files import r_open
+from fuse.utils.files import secure_open
 from fuse.utils.formatters import format_size, format_time, parse_size
 from fuse.utils.generator import ExprError, Node, WordlistGenerator
 
@@ -25,15 +25,21 @@ class Progress:
     value: float = 0
 
 
+@dataclass
+class GenerateOptions:
+    filename: str | None
+    buffering: int
+    quiet_mode: bool
+    separator: str
+    wrange: tuple[str | None, str | None]
+    filter: str | None
+
+
 def generate(
     generator: WordlistGenerator,
-    nodes: List[Node],
-    stats: Tuple[int, int],
-    buffering: int = 0,
-    filename: Optional[str] = None,
-    quiet_mode: bool = False,
-    sep: str = "\n",
-    wrange: Tuple[Optional[str], Optional[str]] = (None, None),
+    nodes: list[Node],
+    stats: tuple[int, int],
+    options: GenerateOptions,
 ) -> int:
     progress = Progress()
     total_bytes, total_words = stats
@@ -43,14 +49,16 @@ def generate(
     thread = threading.Thread(
         target=get_progress, args=(event, progress), kwargs={"total": total_bytes}
     )
-    show_progress_bar = (filename is not None) and (not quiet_mode)
+    show_progress_bar = (options.filename is not None) and (not options.quiet_mode)
 
     # output file or stdout
-    with r_open(filename, "a", encoding="utf-8", buffering=buffering) as fp:
+    with secure_open(
+        options.filename, "a", encoding="utf-8", buffering=options.buffering
+    ) as fp:
         if not fp:
             return 1
 
-        start_token, end_token = wrange
+        start_token, end_token = options.wrange
 
         if show_progress_bar:
             thread.start()
@@ -63,15 +71,24 @@ def generate(
                 event.set()
                 thread.join()
 
+        if options.filter:
+            log.warning(
+                "Using --filter: Some words may be discarded and performance may be reduced."
+            )
+
         log.info(
             datetime.now().strftime(
-                "Starting wordlist generation at %H:%M:%S on %a %b %d %Y."
+                "Wordlist generation started at %H:%M:%S — %a, %b %d %Y."
             )
         )
 
         try:
             for token in generator.generate(nodes, start_from=start_token):
-                progress.value += fp.write(token + sep)
+                if options.filter is not None and not re.match(options.filter, token):
+                    progress.value += len(token + options.separator)
+                    continue
+
+                progress.value += fp.write(token + options.separator)
 
                 # stop when reaching --to
                 if end_token == token:
@@ -80,6 +97,11 @@ def generate(
         except KeyboardInterrupt:
             stop_progress()
             log.warning("Generation stopped with keyboard interrupt!")
+
+            return 1
+        except re.PatternError as err:
+            stop_progress()
+            log.error(f"invalid filter: {err}.")
 
             return 1
         except Exception:
@@ -98,9 +120,9 @@ def generate(
     return 0
 
 
-def f_expression(expression: str, files: List[str]) -> Tuple[str, List[str]]:
+def format_expression(expression: str, files: list[str]) -> tuple[str, list[str]]:
     n_files = 0
-    files_out: List[str] = []
+    files_out: list[str] = []
 
     # escapes @
     def escape_expr(m: re.Match) -> str:
@@ -142,6 +164,15 @@ def main() -> int:
             log.error(f"invalid buffer size: {e}")
             return 1
 
+    gen_options = GenerateOptions(
+        filename=args.output,
+        buffering=buffer_size,
+        quiet_mode=args.quiet,
+        separator=args.separator,
+        wrange=(args.start, args.end),
+        filter=args.filter
+    )
+
     generator = WordlistGenerator()
 
     # file mode (-f/--file)
@@ -150,15 +181,15 @@ def main() -> int:
             log.error("--from/--to are not supported with expression files.")
             return 1
 
-        with r_open(args.expr_file, "r", encoding="utf-8") as fp:
+        with secure_open(args.expr_file, "r", encoding="utf-8") as fp:
             if fp is None:
                 return 1
 
             lines = [line.strip() for line in fp if line.strip()]
-            aliases: List[Tuple[str, str]] = []
-            current_files: List[str] = []
+            aliases: list[tuple[str, str]] = []
+            current_files: list[str] = []
 
-            log.info(f'Opening file "{args.expr_file}" with {len(lines)} lines.')
+            log.info(f'Opening file "{args.expr_file}" (with {len(lines)} lines).')
 
             for i, line in enumerate(lines):
                 # apply aliases
@@ -167,6 +198,7 @@ def main() -> int:
 
                 fields = line.split(" ")
                 keyword = fields[0]
+                arguments = fields[1:]
 
                 # apply comments
                 if keyword == "#":
@@ -179,7 +211,7 @@ def main() -> int:
                             r"invalid file: '%alias' keyword requires 2 arguments."
                         )
                         return 1
-                    aliases.append((fields[1].strip(), " ".join(fields[2:])))
+                    aliases.append((arguments[0].strip(), " ".join(arguments[1:])))
                     continue
 
                 # file include
@@ -189,7 +221,15 @@ def main() -> int:
                             r"invalid file: '%file' keyword requires 1 arguments."
                         )
                         return 1
-                    current_files.append(" ".join(fields[1:]).strip())
+
+                    if arguments[0].startswith("./"):
+                        # get abs path
+                        base_dir = Path(Path(args.expr_file).resolve()).parent
+                        file = str((base_dir / " ".join(arguments).strip()).resolve())
+                    else:
+                        file = " ".join(arguments).strip()
+
+                    current_files.append(file)
                     continue
 
                 try:
@@ -209,20 +249,12 @@ def main() -> int:
 
                 stats = (s_bytes, s_words)
 
-                ret_code = generate(
-                    generator,
-                    nodes,
-                    stats,
-                    filename=args.output,
-                    buffering=buffer_size,
-                    quiet_mode=args.quiet,
-                    sep=args.separator,
-                )
+                ret_code = generate(generator, nodes, stats, gen_options)
                 if ret_code != 0:
                     return ret_code
         return 0
 
-    expression, proc_files = f_expression(args.expression, args.files)
+    expression, proc_files = format_expression(args.expression, args.files)
 
     try:
         try:
@@ -238,36 +270,25 @@ def main() -> int:
         log.info(f"Fuse v{__version__}")
         log.info(f"Fuse will generate {s_words:,} words (~{format_size(s_bytes)}).\n")
     except OverflowError:
-        log.error("Overflow Error. Is the expression correct?")
+        log.error("Overflow Error! Is the expression correct?")
         return 1
 
     if not args.quiet:
         try:
             getpass("Press ENTER to continue...")
+            sys.stdout.write("\033[F")
+            sys.stdout.write("\033[K")
+            sys.stdout.flush()
         except KeyboardInterrupt:
             sys.stdout.write("\n")
             sys.stdout.flush()
             return 0
 
-    sys.stdout.write("\033[F")
-    sys.stdout.write("\033[K")
-    sys.stdout.flush()
-
     stats = (s_bytes, s_words)
-    wrange = (args.start, args.end)
 
     try:
-        return generate(
-            generator,
-            nodes,
-            stats,
-            filename=args.output,
-            buffering=buffer_size,
-            quiet_mode=args.quiet,
-            sep=args.separator,
-            wrange=wrange,
-        )
+        return generate(generator, nodes, stats, gen_options)
     except KeyboardInterrupt:
         log.error("Unexpected keyboard interruption!")
-   
+
     return 1

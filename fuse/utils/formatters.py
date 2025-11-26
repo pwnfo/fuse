@@ -11,6 +11,7 @@ def format_size(b: int | float, d: int = 0) -> str:
 
     return f"{b:.{d}f}EB"
 
+
 def parse_size(size: str) -> int:
     """Returns bytes of a formatted string (e.g., `3.14MB`)"""
     size = size.strip().upper()

@@ -1,17 +1,17 @@
 import re
 
-char_classes = [
-    ["d", "0123456789"],
-    ["h", "0123456789abcdef"],
-    ["H", "0123456789ABCDEF"],
-    ["a", "abcdefghijklmnopqrstuvwxyz"],
-    ["A", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"],
-    ["s", " "],
-    ["o", "01234567"],
-    ["p", "!@#$%^&*()-_+="],
-    ["l", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"],
-    ["N", "\n"],
-]
+CHAR_CLASSES = (
+    ("d", "0123456789"),
+    ("h", "0123456789abcdef"),
+    ("H", "0123456789ABCDEF"),
+    ("a", "abcdefghijklmnopqrstuvwxyz"),
+    ("A", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+    ("s", " "),
+    ("o", "01234567"),
+    ("p", "!@#$%^&*()-_+="),
+    ("l", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+    ("N", "\n"),
+)
 
 
 def pattern_repl(pattern: str, wc: str = "/") -> str:
@@ -19,13 +19,19 @@ def pattern_repl(pattern: str, wc: str = "/") -> str:
 
     def i_replace(m: re.Match) -> str:
         expr = m.group(0)
+
         if expr.startswith("["):
             return expr.replace(i_old, i_new)
+
+        elif expr.startswith("("):
+            return expr.replace(i_old, i_new)
+
         return expr.replace(i_old, f"[{i_new}]")
 
-    for char_class in char_classes:
+    for char_class in CHAR_CLASSES:
         i_old = wc + char_class[0]
         i_new = char_class[1]
+
         pattern = re.sub(r"\[[^\]]*\]|[^[]+", i_replace, pattern)
 
     return pattern

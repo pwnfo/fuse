@@ -7,7 +7,7 @@ from fuse.logger import log
 
 
 @contextmanager
-def r_open(file: str | None, *args: Any, **kwargs: Any) -> Iterator[IO[Any] | None]:
+def secure_open(file: str | None, *args: Any, **kwargs: Any) -> Iterator[IO[Any] | None]:
     """Opens file and handles possible errors. Returns `sys.stdout` if `file=None`"""
     if file is None:
         yield sys.stdout
@@ -29,6 +29,6 @@ def r_open(file: str | None, *args: Any, **kwargs: Any) -> Iterator[IO[Any] | No
             yield None
         finally:
             try:
-                fp.close()
+                fp.close() # type: ignore
             except Exception:
                 pass

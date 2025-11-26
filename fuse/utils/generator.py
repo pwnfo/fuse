@@ -1,10 +1,10 @@
 import re
 
 from itertools import product
-from typing import Generator, Any, List, Tuple
+from typing import Generator, Any
 
 from fuse.utils.classes import pattern_repl
-from fuse.utils.files import r_open
+from fuse.utils.files import secure_open
 
 
 class ExprError(Exception):
@@ -205,7 +205,7 @@ class FileNode(Node):
         out: list[str] = []
         for path in self.base:
             try:
-                with r_open(path, "r", encoding="utf-8", errors="ignore") as fp:
+                with secure_open(path, "r", encoding="utf-8", errors="ignore") as fp:
                     if not fp:
                         raise IOError
                     out.extend(ln.rstrip("\n\r") for ln in fp)
@@ -438,7 +438,7 @@ class WordlistGenerator:
         return tokens
 
     def parse(
-        self, tokens: list[tuple[str, Any]], files: List[str] | None = None
+        self, tokens: list[tuple[str, Any]], files: list[str] | None = None
     ) -> list[Node | FileNode]:
         nodes: list[Node | FileNode] = []
         count_ft = 0

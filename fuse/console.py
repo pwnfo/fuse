@@ -1,5 +1,6 @@
 import sys
 import time
+
 from threading import Event
 from time import sleep
 from typing import Any
