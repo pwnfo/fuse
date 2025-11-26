@@ -194,7 +194,7 @@ def main() -> int:
             for i, line in enumerate(lines):
                 # apply aliases
                 for alias_key, alias_val in aliases:
-                    line = re.sub(r"(?<!\\)\$" + re.escape(alias_key), alias_val, line)
+                    line = re.sub(r"(?<!\\)\$" + re.escape(alias_key) + ";", alias_val, line)
 
                 fields = line.split(" ")
                 keyword = fields[0]
@@ -211,7 +211,12 @@ def main() -> int:
                             r"invalid file: '%alias' keyword requires 2 arguments."
                         )
                         return 1
-                    aliases.append((arguments[0].strip(), " ".join(arguments[1:])))
+                    a_name = arguments[0].strip()
+                    a_value = " ".join(arguments[1:])
+                    if ";" in a_name:
+                        log.error(r"invalid file: '%alias' cannot contain ';'.")
+                        return 1
+                    aliases.append((a_name, a_value))
                     continue
 
                 # file include
