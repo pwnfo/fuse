@@ -1,3 +1,7 @@
+![Version 1.2](http://img.shields.io/badge/version-v1.2-orange.svg)
+![Python 3.10+](http://img.shields.io/badge/python-3.11+-blue.svg)
+![MIT License](http://img.shields.io/badge/license-MIT%20License-blue.svg)
+
 <p align="center">
   <span>Generate wordlists from concise expressions — a compact "regex" for wordlists</span>
   <br>
