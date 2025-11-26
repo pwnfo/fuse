@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fuse-tool"
-version = "1.1.0"
+version = "1.1.1"
 description = "Fuse: Customizable wordlist generator with advanced pattern."
 authors = ["Ryan R. <dev.richarlison@proton.me>"]
 readme = "README.md"

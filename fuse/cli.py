@@ -170,7 +170,7 @@ def main() -> int:
         quiet_mode=args.quiet,
         separator=args.separator,
         wrange=(args.start, args.end),
-        filter=args.filter
+        filter=args.filter,
     )
 
     generator = WordlistGenerator()

@@ -33,9 +33,9 @@ def create_parser(prog: str = "fuse") -> FuseParser:
     options.add_argument("-o", "--output", metavar="<path>", dest="output", help="write the wordlist in the file")
     options.add_argument("-f", "--file", metavar="<path>", dest="expr_file", help="files with different expressions")
     options.add_argument("-q", "--quiet", action="store_true", dest="quiet", help="use quiet mode")
-    options.add_argument("-s", "--separator", metavar="<sep>", dest="separator", default="\n", help="separator beetwen entries")
+    options.add_argument("-s", "--separator", metavar="<sep>", dest="separator", default="\n", help="separator between entries")
     options.add_argument("-b", "--buffer", metavar="<bytes>", dest="buffer", default="AUTO", help="buffer size in wordlist generation")
-    options.add_argument("-F", "--filter", metavar="<regex>", dest="filter", help="filter words with regex")
+    options.add_argument("-F", "--filter", metavar="<regex>", dest="filter", help="filter generated words using a regex")
     options.add_argument("-S", "--from", metavar="<word>", dest="start", help="start writing the wordlist with <word>")
     options.add_argument("-E", "--to", metavar="<word>", dest="end", help="ends writing the wordlist with <word>")
 
