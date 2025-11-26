@@ -163,16 +163,7 @@ $ fuse "id#[0-10:2]"            # id0, id2, id4, id6, id8, id10
 
 Use `-o output.txt` to save the output to a file.
 
----
-
-## Credits
-
-Developed by <a href="https://github.com/pwnfo">**Ryan R.**</a>
-
----
 
 ## License
 
-MIT © Ryan R.
-
----
+MIT © Ryan R. <pwnfo@proton.me>
