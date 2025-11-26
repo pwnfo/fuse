@@ -4,16 +4,31 @@
 # ===============================
 # -- MM/DD/YYYY --
 
-%alias 31d #[0-31]
-%alias 30d #[0-30]
+%alias 31d 0#[1-9]
+%alias 31d-2 #[10-31]
 
-%alias fev 02#[0-29]
+%alias 30d 0#[1-9]
+%alias 30d-2 #[10-30]
 
-%alias 31m [01|03|05|07|08|10|12]$31d;
-%alias 30m [04|06|09|11]$30d;
+%alias fev 020#[1-9]
+%alias fev-2 02#[10-29]
+
+%alias 31dm [01|03|05|07|08|10|12]
+%alias 30dm [04|06|09|11]
+
+%alias 31m $31dm;$31d;
+%alias 31m-2 $31dm;$31d-2;
+
+%alias 30m $30dm;$30d;
+%alias 30m-2 $30dm;$30d-2;
 
 %alias ye #[1800-2030]
 
 $fev;$ye;
+$fev-2;$ye;
+
 $30m;$ye;
+$30m-2;$ye;
+
 $31m;$ye;
+$31m-2;$ye;
