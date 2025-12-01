@@ -317,13 +317,13 @@ def main() -> int:
                 if keyword == r"%alias":
                     if len(fields) < 3:
                         log.error(
-                            r"invalid file: '%alias' keyword requires 2 arguments."
+                            r"invalid file: alias keyword requires 2 arguments."
                         )
                         return 1
                     a_name = arguments[0].strip()
                     a_value = " ".join(arguments[1:])
-                    if ";" in a_name:
-                        log.error(r"invalid file: '%alias' cannot contain ';'.")
+                    if ";" in a_name or "$" in a_name:
+                        log.error(r"invalid file: alias name cannot contain ';' or '$'.")
                         return 1
                     aliases.append((a_name, a_value))
                     continue
