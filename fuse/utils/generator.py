@@ -184,6 +184,34 @@ class Node:
 
         return skipped, None
 
+    def get_item_at(self, index: int) -> str:
+        """retrieves the item at a specific index."""
+        base = self.base
+        base_len = len(base)
+
+        for r in range(self.min_rep, self.max_rep + 1):
+            if r == 0:
+                count = 1
+            else:
+                count = base_len**r
+
+            if index < count:
+                if r == 0:
+                    return ""
+
+                indices: list[int] = []
+                temp = index
+                for _ in range(r):
+                    indices.append(temp % base_len)
+                    temp //= base_len
+
+                chars = [base[i] for i in reversed(indices)]
+                return "".join(chars)
+
+            index -= count
+
+        raise IndexError("index out of range")
+
 
 class FileNode(Node):
     __slots__ = ("_cached_lines", "_cached_sum_len")
@@ -299,6 +327,34 @@ class FileNode(Node):
             skipped_total += base_len**k
 
         return skipped_total, None
+
+    def get_item_at(self, index: int) -> str:
+        """retrieves the item at a specific index."""
+        base = self.lines
+        base_len = len(base)
+
+        for r in range(self.min_rep, self.max_rep + 1):
+            if r == 0:
+                count = 1
+            else:
+                count = base_len**r
+
+            if index < count:
+                if r == 0:
+                    return ""
+
+                indices: list[int] = []
+                temp = index
+                for _ in range(r):
+                    indices.append(temp % base_len)
+                    temp //= base_len
+
+                chars = [base[i] for i in reversed(indices)]
+                return "".join(chars)
+
+            index -= count
+
+        raise IndexError("index out of range")
 
 
 class WordlistGenerator:
@@ -557,6 +613,16 @@ class WordlistGenerator:
 
         return skipped_count
 
+    def get_word_at_index(self, nodes: list[Node | FileNode], index: int) -> str:
+        """retrieves the word at a specific index."""
+        result: list[str] = []
+        for i, node in enumerate(nodes):
+            suffix_cap = self._get_suffix_capacity(nodes, i + 1)
+            node_idx = index // suffix_cap
+            index %= suffix_cap
+            result.append(node.get_item_at(node_idx))
+        return "".join(result)
+
     def stats(
         self,
         nodes: list[Node | FileNode],
@@ -568,7 +634,7 @@ class WordlistGenerator:
         total_count = 1
         total_bytes = 0
 
-        # calculate absolute total (for byte ratio estimation)
+        # calculate absolute total
         for node in nodes:
             if isinstance(node, FileNode):
                 k, sum_len = node.stats_info()

@@ -49,22 +49,18 @@ Core features:
 ```
 usage: fuse [options] <expression> [<files...>]
 
-Fuse v1.1.1
 
-  -h, --help            show this help message and exit
-  -v, --version         show version message and exit
-  -o, --output <path>   write the wordlist in the file
-  -f, --file <path>     files with different expressions
-  -q, --quiet           use quiet mode
-  -s, --separator <sep>
-                        separator between entries
-  -b, --buffer <bytes>  buffer size in wordlist generation
-  -F, --filter <regex>  filter generated words using a regex
-  -S, --from <word>     start writing the wordlist with <word>
-  -E, --to <word>       ends writing the wordlist with <word>
-
-Customizable wordlist generator with advanced pattern.
-Developed by Ryan R. <pwnfo@proton.me>
+-h, --help         show this help message and exit
+-v, --version      show version message and exit
+-o, --output +     write the wordlist in the file
+-f, --file +       files with different expressions
+-q, --quiet        use quiet mode
+-s, --separator +  separator between entries
+-b, --buffer +     buffer size in wordlist generation
+-w, --workers +    number of workers (default is 2)
+-F, --filter +     filter generated words using a regex
+-S, --from +       start writing the wordlist with <word>
+-E, --to +         ends writing the wordlist with <word>
 ```
 
 ### Expression basics

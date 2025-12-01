@@ -2,12 +2,16 @@
 # -*- coding: utf-8 -*-
 import re
 import sys
-import threading
+import multiprocessing
+import signal
+import ctypes
 
+from types import FrameType
 from dataclasses import dataclass
 from datetime import datetime
 from getpass import getpass
 from logging import ERROR
+from typing import Any
 from time import perf_counter
 from pathlib import Path
 from fuse import __version__
@@ -21,11 +25,6 @@ from fuse.utils.generator import ExprError, Node, WordlistGenerator
 
 
 @dataclass
-class Progress:
-    value: float = 0
-
-
-@dataclass
 class GenerateOptions:
     filename: str | None
     buffering: int
@@ -33,6 +32,10 @@ class GenerateOptions:
     separator: str
     wrange: tuple[str | None, str | None]
     filter: str | None
+    threads: int
+
+
+workers: list[multiprocessing.Process] = []
 
 
 def generate(
@@ -41,12 +44,13 @@ def generate(
     stats: tuple[int, int],
     options: GenerateOptions,
 ) -> int:
-    progress = Progress()
+    global workers
+
+    progress = multiprocessing.Value(ctypes.c_longlong, 0)
     total_bytes, total_words = stats
 
-    # thread for progress bar
-    event = threading.Event()
-    thread = threading.Thread(
+    event = multiprocessing.Event()
+    thread = multiprocessing.Process(
         target=get_progress, args=(event, progress), kwargs={"total": total_bytes}
     )
     show_progress_bar = (options.filename is not None) and (not options.quiet_mode)
@@ -83,22 +87,121 @@ def generate(
         )
 
         try:
-            for token in generator.generate(nodes, start_from=start_token):
-                if options.filter is not None and not re.match(options.filter, token):
-                    progress.value += len(token + options.separator)
-                    continue
+            if options.threads > 1:
+                # threaded generation
+                write_lock = multiprocessing.Lock()
 
-                progress.value += fp.write(token + options.separator)
+                # calculate indices
+                start_idx = 0
+                if start_token:
+                    start_idx = generator._calculate_skipped_count(nodes, start_token)
 
-                # stop when reaching --to
-                if end_token == token:
+                count = total_words
+                step = count // options.threads
+                remainder = count % options.threads
+
+                current_idx = start_idx
+
+                def worker(
+                    w_start: str, w_end: str | None, p_val: Any, lock: Any
+                ) -> None:
+                    buf = []
+                    buf_size = 1000
+
+                    try:
+                        with secure_open(
+                            options.filename,
+                            "a",
+                            encoding="utf-8",
+                            buffering=options.buffering,
+                        ) as fp_worker:
+                            if not fp_worker:
+                                return
+
+                            for token in generator.generate(
+                                nodes, start_from=w_start, end=w_end
+                            ):
+                                if options.filter is not None and not re.match(
+                                    options.filter, token
+                                ):
+                                    with lock:
+                                        p_val.value += len(token + options.separator)
+                                    continue
+
+                                buf.append(token + options.separator)
+                                if len(buf) >= buf_size:
+                                    data = "".join(buf)
+                                    with lock:
+                                        fp_worker.write(data)
+                                        p_val.value += len(data)
+                                    buf.clear()
+
+                            if buf:
+                                data = "".join(buf)
+                                with lock:
+                                    fp_worker.write(data)
+                                    p_val.value += len(data)
+
+                    except Exception as e:
+                        log.error(f"worker error: {e}")
+
+                def workers_shutdown(signum: int, frame: FrameType | None) -> None:
                     stop_progress()
-                    break
-        except KeyboardInterrupt:
-            stop_progress()
-            log.warning("Generation stopped with keyboard interrupt!")
+                    
+                    for worker in workers:
+                        if worker.is_alive():
+                            worker.terminate()
 
-            return 1
+                    for worker in workers:
+                        worker.join()
+
+                    log.warning("Generation stopped with keyboard interrupt!")
+                    
+                    sys.exit(0)
+
+                signal.signal(signal.SIGINT, workers_shutdown)
+
+                for i in range(options.threads):
+                    t_count = step + (1 if i < remainder else 0)
+                    if t_count == 0:
+                        continue
+
+                    if i == 0:
+                        w_start = start_token
+                    else:
+                        w_start = generator.get_word_at_index(nodes, current_idx - 1)
+
+                    current_idx += t_count
+                    w_end = generator.get_word_at_index(nodes, current_idx - 1)
+
+                    p = multiprocessing.Process(
+                        target=worker, args=(w_start, w_end, progress, write_lock)
+                    )
+                    workers.append(p)
+                    p.start()
+
+                for p in workers:
+                    p.join()
+
+            else:
+                try:
+                    for token in generator.generate(nodes, start_from=start_token):
+                        if options.filter is not None and not re.match(
+                            options.filter, token
+                        ):
+                            progress.value += len(token + options.separator)
+                            continue
+
+                        progress.value += fp.write(token + options.separator)
+
+                        if end_token == token:
+                            stop_progress()
+                            break
+                except KeyboardInterrupt:
+                    stop_progress()
+                    log.warning("Generation stopped with keyboard interrupt!")
+
+                    return 1
         except re.PatternError as err:
             stop_progress()
             log.error(f"invalid filter: {err}.")
@@ -142,13 +245,16 @@ def format_expression(expression: str, files: list[str]) -> tuple[str, list[str]
 
     return expression, files_out
 
-
 def main() -> int:
     parser = create_parser()
     args = parser.parse_args()
 
     if args.expression is None and args.expr_file is None:
         parser.print_help(sys.stderr)
+        return 1
+
+    if args.workers > 50 or args.workers < 1:
+        log.error(f"invalid number of workers ({args.workers}). choose a value between 1 and 50.")
         return 1
 
     if args.quiet:
@@ -171,6 +277,7 @@ def main() -> int:
         separator=args.separator,
         wrange=(args.start, args.end),
         filter=args.filter,
+        threads=args.workers,
     )
 
     generator = WordlistGenerator()
@@ -194,7 +301,9 @@ def main() -> int:
             for i, line in enumerate(lines):
                 # apply aliases
                 for alias_key, alias_val in aliases:
-                    line = re.sub(r"(?<!\\)\$" + re.escape(alias_key) + ";", alias_val, line)
+                    line = re.sub(
+                        r"(?<!\\)\$" + re.escape(alias_key) + ";", alias_val, line
+                    )
 
                 fields = line.split(" ")
                 keyword = fields[0]
@@ -295,5 +404,7 @@ def main() -> int:
         return generate(generator, nodes, stats, gen_options)
     except KeyboardInterrupt:
         log.error("Unexpected keyboard interruption!")
+    finally:
+        sys.stdout.write("\033[?25h")  # fix cursor bug
 
     return 1
