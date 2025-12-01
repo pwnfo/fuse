@@ -25,7 +25,7 @@ def parse_size(size: str) -> int:
         "PB": 1024**5,
     }
 
-    m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*([KMGTPE]?B)?", size)
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*([KMGTP]?B)?", size)
     if not m:
         raise ValueError(f"invalid format: {size}")
 

@@ -15,23 +15,24 @@ CHAR_CLASSES = (
 
 
 def pattern_repl(pattern: str, wc: str = "/") -> str:
-    """Replaces the word classes of an `pattern`"""
-
-    def i_replace(m: re.Match) -> str:
-        expr = m.group(0)
-
-        if expr.startswith("["):
-            return expr.replace(i_old, i_new)
-
-        elif expr.startswith("("):
-            return expr.replace(i_old, i_new)
-
-        return expr.replace(i_old, f"[{i_new}]")
+    """Replaces the word classes of an `pattern`."""
 
     for char_class in CHAR_CLASSES:
         i_old = wc + char_class[0]
         i_new = char_class[1]
 
-        pattern = re.sub(r"\[[^\]]*\]|[^[]+", i_replace, pattern)
+        unescaped_i_old_re = re.compile(rf"(?<!\\){re.escape(i_old)}")
+
+        def i_replace(m: re.Match) -> str:
+            expr = m.group(0)
+            if expr.startswith("["):
+                return unescaped_i_old_re.sub(i_new, expr)
+
+            if expr.startswith("("):
+                return expr
+
+            return unescaped_i_old_re.sub(lambda mo: f"[{i_new}]", expr)
+
+        pattern = re.sub(r"(?<!\\)\[[^\]]*\]|(?<!\\)[^[]+", i_replace, pattern)
 
     return pattern

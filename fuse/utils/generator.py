@@ -9,7 +9,7 @@ from fuse.utils.files import secure_open
 
 class ExprError(Exception):
     def __init__(self, message: str) -> None:
-        super().__init__(message)
+        super().__init__("expression error: " + message)
 
 
 class Node:

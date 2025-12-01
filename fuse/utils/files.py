@@ -21,7 +21,7 @@ def secure_open(
             log.error(f'file "{file}" not found.')
             yield None
         except PermissionError:
-            log.error(f'no read permission for "{file}".')
+            log.error(f'no permission for "{file}".')
             yield None
         except IsADirectoryError:
             log.error(f'"{file}" is a directory.')

@@ -145,7 +145,7 @@ Prefix a filename with `//` to treat it as an inline expression instead of a fil
 Use `\` to escape special characters.
 
 ```
-$ fuse "\\/d/d"
+$ fuse "\/d/d"
 # output: /d/0, /d/1, ..., /d/9
 ```
 
