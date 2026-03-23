@@ -1,0 +1,11 @@
+#
+# LOGINS - EXAMPLE FILE
+# ===============================
+# admin:password, ryan:12345678...
+# ===============================
+
+%file ./wordlists/users.txt
+%file ./wordlists/pass.txt
+
+# <user>:<pass>
+@:@
