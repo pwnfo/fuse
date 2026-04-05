@@ -73,7 +73,7 @@ def create_parser(prog: str = "fuse") -> FuseParser:
     options.add_argument(
         "-w",
         "--workers",
-        metavar="<1-50>",
+        metavar="<1-64>",
         dest="workers",
         type=int,
         default=1,

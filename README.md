@@ -58,7 +58,7 @@ usage: fuse [options] <expression> [<files...>]
   -s, --separator <word>
                         separator between entries
   -b, --buffer <bytes>  buffer size in wordlist generation
-  -w, --workers <1-50>  number of workers (default is 1)
+  -w, --workers <1-64>  number of workers (default is 1)
   -F, --filter <regex>  filter generated words using a regex
   --from <word>         start writing the wordlist with <word>
   --to <word>           ends writing the wordlist with <word>
