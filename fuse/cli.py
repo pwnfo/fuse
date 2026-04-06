@@ -151,7 +151,7 @@ def generate(
 
                 def workers_shutdown(signum: int, frame: FrameType | None) -> None:
                     stop_progress()
-                    
+
                     for worker in workers:
                         if worker.is_alive():
                             worker.terminate()
@@ -160,7 +160,7 @@ def generate(
                         worker.join()
 
                     log.warning("Generation stopped with keyboard interrupt!")
-                    
+
                     sys.exit(0)
 
                 signal.signal(signal.SIGINT, workers_shutdown)
@@ -249,6 +249,7 @@ def format_expression(expression: str, files: list[str]) -> tuple[str, list[str]
 
     return expression, files_out
 
+
 def main() -> int:
     parser = create_parser()
     args = parser.parse_args()
@@ -258,7 +259,9 @@ def main() -> int:
         return 1
 
     if 64 < args.workers > 1:
-        log.error(f"invalid number of workers ({args.workers}). choose a value between 1 and 64.")
+        log.error(
+            f"invalid number of workers ({args.workers}). choose a value between 1 and 64."
+        )
         return 1
 
     if args.quiet:

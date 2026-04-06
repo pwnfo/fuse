@@ -26,14 +26,12 @@ def process_expr_file(
     aliases: list[tuple[str, str]] = []
     current_files: list[str] = []
 
-    log.info(f'opening file \'{filepath}\' (with {len(lines)} lines).')
+    log.info(f"opening file '{filepath}' (with {len(lines)} lines).")
 
     for i, line in enumerate(lines):
         # expand aliases
         for alias_key, alias_val in aliases:
-            line = re.sub(
-                r"(?<!\\)\$" + re.escape(alias_key) + ";", alias_val, line
-            )
+            line = re.sub(r"(?<!\\)\$" + re.escape(alias_key) + ";", alias_val, line)
 
         fields = line.split(" ")
         keyword = fields[0]
@@ -46,24 +44,18 @@ def process_expr_file(
         # alias definition
         if keyword == r"%alias":
             if len(fields) < 3:
-                raise InvalidSyntaxError(
-                    "alias keyword requires 2 arguments."
-                )
+                raise InvalidSyntaxError("alias keyword requires 2 arguments.")
             a_name = arguments[0].strip()
             a_value = " ".join(arguments[1:])
             if ";" in a_name or "$" in a_name:
-                raise InvalidSyntaxError(
-                    "alias name cannot contain ';' or '$'."
-                )
+                raise InvalidSyntaxError("alias name cannot contain ';' or '$'.")
             aliases.append((a_name, a_value))
             continue
 
         # file include
         if keyword == r"%file":
             if len(fields) < 2:
-                raise InvalidSyntaxError(
-                    "'%file' keyword requires 1 argument."
-                )
+                raise InvalidSyntaxError("'%file' keyword requires 1 argument.")
 
             if arguments[0].startswith("./"):
                 base_dir = Path(Path(filepath).resolve()).parent
