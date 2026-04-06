@@ -471,7 +471,7 @@ class WordlistGenerator:
                 tokens.append(("QMARK", None))
                 i += 1
                 continue
-            if c == "@":
+            if c == "^":
                 tokens.append(("FILE", None))
                 i += 1
                 continue

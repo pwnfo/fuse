@@ -231,20 +231,12 @@ def format_expression(expression: str, files: list[str]) -> tuple[str, list[str]
     n_files = 0
     files_out: list[str] = []
 
-    # escapes @
-    def escape_expr(m: re.Match) -> str:
-        b = m.group(1)
-        return b + r"\@" if len(b) % 2 == 0 else m.group(0)
-
-    expression = re.sub(r"(\\*)@", escape_expr, expression)
-
     for file_path in files:
         if file_path.startswith("//"):
             inline = file_path.replace("//", "", 1)
             expression = re.sub(r"(?<!\\)\^", lambda m: inline, expression, count=1)
             n_files += 1
         else:
-            expression = re.sub(r"(?<!\\)\^", "@", expression, count=1)
             files_out.append(file_path)
 
     return expression, files_out
