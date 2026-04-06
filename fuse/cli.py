@@ -18,9 +18,9 @@ from fuse import __version__
 from fuse.logger import log
 from fuse.args import create_parser
 from fuse.console import get_progress
-from fuse.utils.files import secure_open
-from fuse.utils.formatters import format_size, format_time, parse_size
-from fuse.utils.generator import ExprError, Node, WordlistGenerator
+from fuse.core.files import secure_open
+from fuse.core.formatters import format_size, format_time, parse_size
+from fuse.core.generator import ExprError, Node, WordlistGenerator
 from fuse.file_parser import InvalidSyntaxError, process_expr_file
 
 

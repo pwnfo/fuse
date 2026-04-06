@@ -3,8 +3,8 @@ import re
 from itertools import product
 from typing import Generator, Any
 
-from fuse.utils.classes import pattern_repl
-from fuse.utils.files import secure_open
+from fuse.core.classes import pattern_repl
+from fuse.core.files import secure_open
 
 
 class ExprError(Exception):

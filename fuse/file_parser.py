@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Iterator
 
 from fuse.logger import log
-from fuse.utils.files import secure_open
+from fuse.core.files import secure_open
 
 
 class InvalidSyntaxError(Exception):

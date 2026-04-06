@@ -5,7 +5,7 @@ from threading import Event
 from time import sleep
 from typing import Any
 
-from fuse.utils.formatters import format_size
+from fuse.core.formatters import format_size
 
 
 def calc_rate(prev_bytes: int, curr_bytes: int, delta_time: float) -> str:
