@@ -1,9 +1,8 @@
-![Version 2.1](http://img.shields.io/badge/version-v2.1-orange.svg)
-![Python 3.10+](http://img.shields.io/badge/python-3.11+-blue.svg)
-![MIT License](http://img.shields.io/badge/license-MIT%20License-blue.svg)
-
 <p align="center">
-  <span>Generate wordlists from concise expressions — a compact "regex" for wordlists</span>
+  <br>
+  <a href="https://github.com/pwnfo/fuse" target="_blank"><img src="images/icon.png" width="30%" alt="fuse"/></a>
+  <br>
+  <span>Generate wordlists from concise expressions</span>
   <br>
 </p>
 
@@ -11,44 +10,47 @@
   <a href="#installation">Installation</a>
   &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;
   <a href="#usage">Usage</a>
-  &nbsp;&nbsp;&nbsp;
+  &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;
+  <a href="#contributing">Contributing</a>
 </p>
 
 <p align="center">
-<img src="images/demo.png" alt="demo"/>
+<img width="80%" src="images/demo.png" alt="demo"/>
 </p>
-
-## Description
-
-**Fuse** - Wordlist Generator
-
-A tool to generate wordlists from compact expressions. Fuse parses character classes, quantifiers, file placeholders, and combines them into outputs useful for password lists, testing, or data generation.
-
-Core features:
-
-* Short expressions describing large word sets
-* Support for built-in and custom character classes
-* Placeholders for files and inline expressions
-* Quantifiers, numeric ranges, and escaping special characters
-
----
 
 ## Installation
 
-> **Recommended**: install using `pipx` or `pip` for the PyPI version.
+> [!NOTE]  
+> It is **recommended** to install using `pipx` or `pip` for the PyPI version.
 
-| Method                           | Notes                                                                     |
-| -------------------------------- | ------------------------------------------------------------------------- |
-| `pipx install fuse-tool`          | `pip` can be used instead of `pipx`                                       |
-| Clone and install from GitHub    | `git clone https://github.com/pwnfo/fuse.git && cd fuse && pip install .` |
+| Method | Notes |
+| - | - |
+| `pipx install fuse-tool` | `pip` may be used in place of `pipx` |
+| `git clone https://github.com/pwnfo/fuse.git && cd fuse && pip install .` | Clone and install directly from GitHub |
 
----
+## General usage
 
-## Usage
-
+To generate a wordlist from a simple expression:
+```bash
+fuse "/l{2,4}"
 ```
+
+To combine files with generators:
+```bash
+fuse "^:^" names.txt pass.txt
+```
+
+Outputs can be manipulated, filtered, and saved.
+
+```console
+$ fuse --help
 usage: fuse [options] <expression> [<files...>]
 
+ ___  _ _  __  ___ 
+| __|| | |/ _|| __|
+| _| | U |\_ \| _| 
+|_|  |___||__/|___|
+                    v2.1.0
 
   -h, --help            show this help message and exit
   -v, --version         show version message and exit
@@ -62,6 +64,9 @@ usage: fuse [options] <expression> [<files...>]
   -F, --filter <regex>  filter generated words using a regex
   --from <word>         start writing the wordlist with <word>
   --to <word>           ends writing the wordlist with <word>
+
+Powerful pattern-based wordlist generation tool.
+Developed by Ryan R. <pwnfo@proton.me>
 ```
 
 ### Expression basics
@@ -71,8 +76,7 @@ usage: fuse [options] <expression> [<files...>]
 * Concatenation combines positions: each position picks one value from its token and concatenates.
 
 Example:
-
-```
+```bash
 $ fuse "/l{2,3}"
 # output: aa, ab, ac, ..., ZY, ZZ
 ```
@@ -97,7 +101,6 @@ Example: `/l/l` generates all two-letter combinations (upper and lower case).
 
 * `[abc]` selects **one character** from `a`, `b`, or `c`.
 * Use `|` to separate full-word alternatives (each treated as a multi-character token):
-
   * `[admin|root|123]` inserts `admin` OR `root` OR `123` at that point.
 
 ### Quantifiers
@@ -107,8 +110,7 @@ Example: `/l/l` generates all two-letter combinations (upper and lower case).
 * `?` — optional (0 or 1 time)
 
 Examples:
-
-```
+```bash
 $ fuse "[XYZ]{3}"         # XXX, XXY, ..., ZZZ
 $ fuse "[XYZ]{2,5}"       # XY, XZ, ..., XYZXY
 $ fuse "Ryan?/d"          # Rya0, Rya1, ..., Ryan9
@@ -126,8 +128,7 @@ These numeric ranges can be used in any position of an expression.
 ### Files and placeholders
 
 Use `^` in an expression as a placeholder for the next file argument. Each `^` consumes one file and iterates over its lines:
-
-```
+```bash
 $ fuse "^/d" names.txt
 # output: Bob0, Bob1, ..., Ana0, Ana1, ...
 
@@ -140,27 +141,24 @@ Prefix a filename with `//` to treat it as an inline expression instead of a fil
 ### Escaping special characters
 
 Use `\` to escape special characters.
-
-```
+```bash
 $ fuse "\/d/d"
 # output: /d/0, /d/1, ..., /d/9
 ```
 
----
+## Contributing
 
-## Examples
+We welcome contributions to Fuse! Whether it's adding new features, improving documentation, or fixing bugs, your help is appreciated. 
+Feel free to open an issue or submit a pull request on our GitHub repository at `pwnfo/fuse`.
 
-```
-$ fuse "/l{2,4}"                # words with 2 to 4 letters
-$ fuse "[/l/d]{3}"              # 3-char words mixing letters and digits
-$ fuse "^:^" names.txt pass.txt  # combine two files with separator
-$ fuse "user#[1-5]"             # user1, user2, user3, user4, user5
-$ fuse "id#[0-10:2]"            # id0, id2, id4, id6, id8, id10
-```
+## Star History
 
-Use `-o output.txt` to save the output to a file.
-
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=pwnfo/fuse&type=Date&theme=dark" />
+  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=pwnfo/fuse&type=Date" />
+  <img alt="Fuse Project Star History Chart" src="https://api.star-history.com/svg?repos=pwnfo/fuse&type=Date" />
+</picture>
 
 ## License
 
-MIT © Ryan R. <pwnfo@proton.me>
+MIT © Ryan R. &lt;pwnfo@proton.me&gt;
