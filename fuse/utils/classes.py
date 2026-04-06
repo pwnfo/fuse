@@ -1,38 +1,92 @@
-import re
-
-CHAR_CLASSES = (
-    ("d", "0123456789"),
-    ("h", "0123456789abcdef"),
-    ("H", "0123456789ABCDEF"),
-    ("a", "abcdefghijklmnopqrstuvwxyz"),
-    ("A", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
-    ("s", " "),
-    ("o", "01234567"),
-    ("p", "!@#$%^&*()-_+="),
-    ("l", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"),
-    ("N", "\n"),
-)
+CHAR_CLASSES: dict[str, str] = {
+    "d": "0123456789",
+    "h": "0123456789abcdef",
+    "H": "0123456789ABCDEF",
+    "a": "abcdefghijklmnopqrstuvwxyz",
+    "A": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    "s": " ",
+    "o": "01234567",
+    "p": "!@#$%^&*()-_+=",
+    "l": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    "N": "\n",
+}
 
 
 def pattern_repl(pattern: str, wc: str = "/") -> str:
-    """Replaces the word classes of an `pattern`."""
+    """Replace character-class shortcuts"""
+    out: list[str] = []
+    i = 0
+    n = len(pattern)
+    wc_len = len(wc)
 
-    for char_class in CHAR_CLASSES:
-        i_old = wc + char_class[0]
-        i_new = char_class[1]
+    while i < n:
+        ch = pattern[i]
 
-        unescaped_i_old_re = re.compile(rf"(?<!\\){re.escape(i_old)}")
+        if ch == "\\":
+            if i + 1 < n:
+                out.append(ch)
+                out.append(pattern[i + 1])
+                i += 2
+            else:
+                out.append(ch)
+                i += 1
+            continue
 
-        def i_replace(m: re.Match) -> str:
-            expr = m.group(0)
-            if expr.startswith("["):
-                return unescaped_i_old_re.sub(i_new, expr)
+        # literal group (...)
+        if ch == "(":
+            out.append(ch)
+            i += 1
+            while i < n:
+                if pattern[i] == "\\" and i + 1 < n:
+                    out.append(pattern[i])
+                    out.append(pattern[i + 1])
+                    i += 2
+                elif pattern[i] == ")":
+                    out.append(pattern[i])
+                    i += 1
+                    break
+                else:
+                    out.append(pattern[i])
+                    i += 1
+            continue
 
-            if expr.startswith("("):
-                return expr
+        # bracketed class [...]
+        if ch == "[":
+            out.append(ch)
+            i += 1
+            while i < n:
+                if pattern[i] == "\\" and i + 1 < n:
+                    out.append(pattern[i])
+                    out.append(pattern[i + 1])
+                    i += 2
+                elif pattern[i] == "]":
+                    out.append(pattern[i])
+                    i += 1
+                    break
+                elif pattern[i : i + wc_len] == wc and i + wc_len < n:
+                    key = pattern[i + wc_len]
+                    if key in CHAR_CLASSES:
+                        out.append(CHAR_CLASSES[key])
+                        i += wc_len + 1
+                    else:
+                        out.append(pattern[i])
+                        i += 1
+                else:
+                    out.append(pattern[i])
+                    i += 1
+            continue
 
-            return unescaped_i_old_re.sub(lambda mo: f"[{i_new}]", expr)
+        # outside brackets
+        if pattern[i : i + wc_len] == wc and i + wc_len < n:
+            key = pattern[i + wc_len]
+            if key in CHAR_CLASSES:
+                out.append("[")
+                out.append(CHAR_CLASSES[key])
+                out.append("]")
+                i += wc_len + 1
+                continue
 
-        pattern = re.sub(r"(?<!\\)\[[^\]]*\]|(?<!\\)[^[]+", i_replace, pattern)
+        out.append(ch)
+        i += 1
 
-    return pattern
+    return "".join(out)
