@@ -82,7 +82,7 @@ def generate(
 
         log.info(
             datetime.now().strftime(
-                "Wordlist generation started at %H:%M:%S — %a, %b %d %Y."
+                "Wordlist generation started at %H:%M:%S on %a, %b %d %Y."
             )
         )
 
@@ -222,7 +222,7 @@ def generate(
         thread.join()
 
     speed = int(total_words / elapsed) if elapsed > 0 else 0
-    log.info(f"Complete word generation in {format_time(elapsed)} ({speed} W/s).")
+    log.info(f"Finished generating words in {format_time(elapsed)} ({speed} W/s).")
 
     return 0
 
@@ -345,7 +345,7 @@ def main() -> int:
 
     if not args.quiet:
         try:
-            getpass("Press ENTER to continue...")
+            getpass("Press [ENTER] to continue...")
             sys.stdout.write("\033[F")
             sys.stdout.write("\033[K")
             sys.stdout.flush()

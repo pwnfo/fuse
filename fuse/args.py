@@ -7,6 +7,14 @@ from fuse.logger import log
 
 from typing import Never
 
+BANNER = rf"""
+ ___  _ _  __  ___ 
+| __|| | |/ _|| __|
+| _| | U |\_ \| _| 
+|_|  |___||__/|___|
+                    v{__version__}
+"""
+
 
 class FuseParser(argparse.ArgumentParser):
     def error(self, message: str) -> Never:
@@ -21,7 +29,7 @@ def create_parser(prog: str = "fuse") -> FuseParser:
         prog=prog,
         add_help=False,
         usage=f"{prog} [options] <expression> [<files...>]",
-        description=f"Fuse v{__version__}",
+        description=BANNER,
         epilog=__description__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
