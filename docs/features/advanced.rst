@@ -6,10 +6,11 @@ Expression Files (.fuse)
 For very complex generations, you can author ``.fuse`` files instead of invoking the CLI. These files allow defining explicit aliases and sequentially joining outputs from multiple sub-expressions. 
 
 **Syntax Overview**
+
 - Comments start with ``#`` (it must be followed by a space to be interpreted as a comment).
-- ``%alias name pattern``: Replace `$name;` with `pattern` throughout the rest of the file.
-- ``%file filename.txt``: Expressly opens a file relative to the `.fuse` script or an absolute path.
-- **Important**: When you declare a `%file`, that file is bound to the ``^`` placeholder in the **very next expression line**. It does not persist globally. You can declare multiple `%file` lines consecutively to bind to multiple ``^`` placeholders in the next expression.
+- ``%alias name pattern``: Replace ``$name;`` with ``pattern`` throughout the rest of the file.
+- ``%file filename.txt``: Expressly opens a file relative to the ``.fuse`` script or an absolute path.
+- **Important**: When you declare a ``%file``, that file is bound to the ``^`` placeholder in the **very next expression line**. It does not persist globally. You can declare multiple ``%file`` lines consecutively to bind to multiple ``^`` placeholders in the next expression.
 - Any other (non-empty) line is treated as an expression.
 
 **Example payloads.fuse**:
@@ -18,13 +19,13 @@ For very complex generations, you can author ``.fuse`` files instead of invoking
 
    # Define Reusable Payload Aliases
    %alias DIGIT #[0-9]
-   %alias BASE_URL https://example.com/api/
+   %alias BASE_URL (https://example.com/api/)
    
    # Include a dictionary text file from previous runs
    %file default_paths.txt
 
    # Expression Generation
-   $BASE_URL;^?id=$DIGIT; # Example: https://example.com/api/account?id=1
+   $BASE_URL;^\?id=$DIGIT; # Example: https://example.com/api/account?id=1
    $BASE_URL;v$DIGIT; # Example: https://example.com/api/v1
 
 Run using ``-f`` or ``--file``:
