@@ -52,12 +52,13 @@ class Node:
         if min_r == 0 and max_r == 0:
             yield ""
             return
+        join = "".join
         for k in range(min_r, max_r + 1):
             if k == 0:
                 yield ""
             else:
                 for tup in product(base, repeat=k):
-                    yield "".join(tup)
+                    yield join(tup)
 
     def expand_resume(
         self, start_from: str
@@ -128,9 +129,6 @@ class Node:
                 yield from self._product_resume_recursive(
                     pool, depth - 1, target, candidate, seeking=False
                 )
-
-            else:
-                pass
 
     def get_skipped_count(self, target: str) -> tuple[int, str | None]:
         """calculates how many items this node skips to reach a prefix of 'target'."""
