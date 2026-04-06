@@ -13,7 +13,6 @@ from getpass import getpass
 from logging import ERROR
 from typing import Any
 from time import perf_counter
-from pathlib import Path
 from fuse import __version__
 
 from fuse.logger import log
@@ -22,6 +21,7 @@ from fuse.console import get_progress
 from fuse.utils.files import secure_open
 from fuse.utils.formatters import format_size, format_time, parse_size
 from fuse.utils.generator import ExprError, Node, WordlistGenerator
+from fuse.file_parser import InvalidSyntaxError, process_expr_file
 
 
 @dataclass
@@ -292,71 +292,16 @@ def main() -> int:
             log.error("--from/--to are not supported with expression files.")
             return 1
 
-        with secure_open(args.expr_file, "r", encoding="utf-8") as fp:
-            if fp is None:
-                return 1
-
-            lines = [line.strip() for line in fp if line.strip()]
-            aliases: list[tuple[str, str]] = []
-            current_files: list[str] = []
-
-            log.info(f'Opening file "{args.expr_file}" (with {len(lines)} lines).')
-
-            for i, line in enumerate(lines):
-                # apply aliases
-                for alias_key, alias_val in aliases:
-                    line = re.sub(
-                        r"(?<!\\)\$" + re.escape(alias_key) + ";", alias_val, line
-                    )
-
-                fields = line.split(" ")
-                keyword = fields[0]
-                arguments = fields[1:]
-
-                # apply comments
-                if keyword == "#":
-                    continue
-
-                # alias definition
-                if keyword == r"%alias":
-                    if len(fields) < 3:
-                        log.error(
-                            r"invalid file: alias keyword requires 2 arguments."
-                        )
-                        return 1
-                    a_name = arguments[0].strip()
-                    a_value = " ".join(arguments[1:])
-                    if ";" in a_name or "$" in a_name:
-                        log.error(r"invalid file: alias name cannot contain ';' or '$'.")
-                        return 1
-                    aliases.append((a_name, a_value))
-                    continue
-
-                # file include
-                if keyword == r"%file":
-                    if len(fields) < 2:
-                        log.error(
-                            r"invalid file: '%file' keyword requires 1 arguments."
-                        )
-                        return 1
-
-                    if arguments[0].startswith("./"):
-                        # get abs path
-                        base_dir = Path(Path(args.expr_file).resolve()).parent
-                        file = str((base_dir / " ".join(arguments).strip()).resolve())
-                    else:
-                        file = " ".join(arguments).strip()
-
-                    current_files.append(file)
-                    continue
-
+        try:
+            for i, (expression, expr_files) in enumerate(
+                process_expr_file(args.expr_file)
+            ):
                 try:
-                    tokens = generator.tokenize(line)
-                    nodes = generator.parse(tokens, files=(current_files or None))
+                    tokens = generator.tokenize(expression)
+                    nodes = generator.parse(tokens, files=(expr_files or None))
                     s_bytes, s_words = generator.stats(
                         nodes, sep_len=len(args.separator)
                     )
-                    current_files = []  # reset files after usage
                 except ExprError as e:
                     log.error(e)
                     return 1
@@ -370,6 +315,10 @@ def main() -> int:
                 ret_code = generate(generator, nodes, stats, gen_options)
                 if ret_code != 0:
                     return ret_code
+        except InvalidSyntaxError as e:
+            log.error(e)
+            return 1
+
         return 0
 
     expression, proc_files = format_expression(args.expression, args.files)
