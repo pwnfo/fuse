@@ -6,10 +6,14 @@ build:
     python: "3.11"
   jobs:
     post_create_environment:
-      - pip install poetry
-      - poetry config virtualenvs.create false
-    post_install:
-      - poetry install --with docs
+      - pip install poetry poetry-plugin-export
+      - poetry export --with docs --without-hashes -o requirements.txt
+
+python:
+  install:
+    - requirements: requirements.txt
+    - method: pip
+      path: .
 
 sphinx:
   builder: html
