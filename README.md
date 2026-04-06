@@ -1,4 +1,4 @@
-![Version 2.0](http://img.shields.io/badge/version-v2.0-orange.svg)
+![Version 2.1](http://img.shields.io/badge/version-v2.1-orange.svg)
 ![Python 3.10+](http://img.shields.io/badge/python-3.11+-blue.svg)
 ![MIT License](http://img.shields.io/badge/license-MIT%20License-blue.svg)
 
