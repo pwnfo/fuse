@@ -4,5 +4,5 @@ __pycache__
 build
 env
 dist
-
+docs/_build
 TODO.md
