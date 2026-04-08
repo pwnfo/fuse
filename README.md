@@ -83,17 +83,18 @@ $ fuse "/l{2,3}"
 
 ### Character classes
 
-| Symbol | Meaning                 |
-| ------ | ----------------------- |
-| `/l`   | letters (a–z, A–Z)      |
-| `/a`   | lowercase letters (a–z) |
-| `/A`   | uppercase letters (A–Z) |
-| `/d`   | digits (0–9)            |
-| `/h`   | hexadecimal (0–9, a–f)  |
-| `/s`   | space                   |
-| `/o`   | octal digits (0–7)      |
-| `/p`   | special characters      |
-| `/N`   | newline (`\n`)          |
+| Symbol | Meaning                          |
+| ------ | -------------------------------- |
+| `/l`   | letters (a–z, A–Z)               |
+| `/a`   | lowercase letters (a–z)          |
+| `/A`   | uppercase letters (A–Z)          |
+| `/d`   | digits (0–9)                     |
+| `/h`   | lowercase hexadecimal (0–9, a–f) |
+| `/H`   | uppercase hexadecimal (0–9, A–F) |
+| `/s`   | space                            |
+| `/o`   | octal digits (0–7)               |
+| `/p`   | special characters               |
+| `/N`   | newline (`\n`)                   |
 
 Example: `/l/l` generates all two-letter combinations (upper and lower case).
 
