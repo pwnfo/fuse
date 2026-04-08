@@ -43,8 +43,9 @@ def get_progress(e: Event, r: Any, total: int = 100) -> None:
 
             message = (
                 f"Generating {format_size(r.value, d=2)} / {format_size(total, d=2)} "
-                f"[{progress_pct}%] @ {rate} ETA {mins:02d}:{secs:02d}    \r"
+                f"[{progress_pct}%] @ {rate} ETA {mins:02d}:{secs:02d}"
             )
+            sys.stdout.write("\033[2K\r")
             sys.stdout.write(message)
             sys.stdout.flush()
 
@@ -54,6 +55,5 @@ def get_progress(e: Event, r: Any, total: int = 100) -> None:
         except KeyboardInterrupt:
             break
 
-    sys.stdout.write("\033[?25h")
-    sys.stdout.write(" " * len(message) + "\r")
+    sys.stdout.write("\033[?25h\033[2K\r")
     sys.stdout.flush()
