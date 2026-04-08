@@ -54,6 +54,6 @@ def get_progress(e: Event, r: Any, total: int = 100) -> None:
             sleep(0.5)
         except KeyboardInterrupt:
             break
-        finally:
-            sys.stdout.write("\033[?25h\033[2K\r")
-            sys.stdout.flush()
+
+    sys.stdout.write("\033[?25h\033[2K\r")
+    sys.stdout.flush()
