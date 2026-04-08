@@ -222,7 +222,7 @@ def generate(
         thread.join()
 
     speed = int(total_words / elapsed) if elapsed > 0 else 0
-    log.info(f"Finished generating words in {format_time(elapsed)} ({speed} W/s).")
+    log.info(f"Finished in {format_time(elapsed)} ({speed} W/s).")
 
     return 0
 
