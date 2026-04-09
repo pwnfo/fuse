@@ -57,6 +57,13 @@ def generate(
             log.error(f"invalid filter: {err}.")
             return 1
 
+        log.warning("[Warning] Filtering can discard words and reduce performance.")
+
+    if options.threads > 1:
+        log.warning(
+            f"[Warning] Using multiple workers may result in interleaved output."
+        )
+
     event = multiprocessing.Event()
     thread = multiprocessing.Process(
         target=get_progress, args=(event, progress), kwargs={"total": total_bytes}
@@ -83,11 +90,6 @@ def generate(
                 event.set()
                 thread.join()
 
-        if options.filter:
-            log.warning(
-                "Using --filter: Some words may be discarded and performance may be reduced."
-            )
-
         log.info(
             datetime.now().strftime(
                 "Wordlist generation started at %H:%M:%S on %a, %b %d %Y."
@@ -96,10 +98,6 @@ def generate(
 
         try:
             if options.threads > 1:
-                log.warning(
-                    f"Note: Using multiple workers ({options.threads}) may result in interleaved output."
-                )
-
                 # threaded generation
                 write_lock = multiprocessing.Lock()
 
@@ -133,9 +131,7 @@ def generate(
                             for token in generator.generate(
                                 nodes, start_from=w_start, end=w_end
                             ):
-                                if pattern is not None and not re.match(
-                                    pattern, token
-                                ):
+                                if pattern is not None and not re.match(pattern, token):
                                     with lock:
                                         p_val.value += len(token + options.separator)
                                     continue
@@ -198,9 +194,7 @@ def generate(
             else:
                 try:
                     for token in generator.generate(nodes, start_from=start_token):
-                        if pattern is not None and not re.match(
-                            pattern, token
-                        ):
+                        if pattern is not None and not re.match(pattern, token):
                             progress.value += len(token + options.separator)
                             continue
 
