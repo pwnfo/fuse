@@ -49,6 +49,14 @@ def generate(
     progress = multiprocessing.Value(ctypes.c_longlong, 0)
     total_bytes, total_words = stats
 
+    pattern = None
+    if options.filter is not None:
+        try:
+            pattern = re.compile(options.filter)
+        except re.PatternError as err:
+            log.error(f"invalid filter: {err}.")
+            return 1
+
     event = multiprocessing.Event()
     thread = multiprocessing.Process(
         target=get_progress, args=(event, progress), kwargs={"total": total_bytes}
@@ -125,8 +133,8 @@ def generate(
                             for token in generator.generate(
                                 nodes, start_from=w_start, end=w_end
                             ):
-                                if options.filter is not None and not re.match(
-                                    options.filter, token
+                                if pattern is not None and not re.match(
+                                    pattern, token
                                 ):
                                     with lock:
                                         p_val.value += len(token + options.separator)
@@ -190,8 +198,8 @@ def generate(
             else:
                 try:
                     for token in generator.generate(nodes, start_from=start_token):
-                        if options.filter is not None and not re.match(
-                            options.filter, token
+                        if pattern is not None and not re.match(
+                            pattern, token
                         ):
                             progress.value += len(token + options.separator)
                             continue
@@ -206,11 +214,6 @@ def generate(
                     log.warning("Generation stopped with keyboard interrupt!")
 
                     return 1
-        except re.PatternError as err:
-            stop_progress()
-            log.error(f"invalid filter: {err}.")
-
-            return 1
         except Exception:
             stop_progress()
             raise
