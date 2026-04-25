@@ -4,8 +4,8 @@
 # admin:password, ryan:12345678...
 # ===============================
 
-%file ./wordlists/users.txt
-%file ./wordlists/pass.txt
+%include ./wordlists/users.txt
+%include ./wordlists/pass.txt
 
 # <user>:<pass>
 ^:^

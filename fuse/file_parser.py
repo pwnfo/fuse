@@ -23,15 +23,15 @@ def process_expr_file(
 
         lines = [line.strip() for line in fp if line.strip()]
 
-    aliases: list[tuple[str, str]] = []
+    defines: list[tuple[str, str]] = []
     current_files: list[str] = []
 
     log.info(f"opening file '{filepath}' (with {len(lines)} lines).")
 
     for i, line in enumerate(lines):
-        # expand aliases
-        for alias_key, alias_val in aliases:
-            line = re.sub(r"(?<!\\)\$" + re.escape(alias_key) + ";", alias_val, line)
+        # expand defines
+        for def_key, def_val in defines:
+            line = re.sub(r"(?<!\\)\$" + re.escape(def_key) + ";", def_val, line)
 
         fields = line.split(" ")
         keyword = fields[0]
@@ -41,21 +41,21 @@ def process_expr_file(
         if keyword == "#":
             continue
 
-        # alias definition
-        if keyword == r"%alias":
+        # ´define´ definition
+        if keyword == r"%define":
             if len(fields) < 3:
-                raise InvalidSyntaxError("alias keyword requires 2 arguments.")
-            a_name = arguments[0].strip()
-            a_value = " ".join(arguments[1:])
-            if ";" in a_name or "$" in a_name:
-                raise InvalidSyntaxError("alias name cannot contain ';' or '$'.")
-            aliases.append((a_name, a_value))
+                raise InvalidSyntaxError("'%define' keyword requires 2 arguments.")
+            d_name = arguments[0].strip()
+            d_value = " ".join(arguments[1:])
+            if ";" in d_name or "$" in d_name:
+                raise InvalidSyntaxError("define name cannot contain ';' or '$'.")
+            defines.append((d_name, d_value))
             continue
 
-        # file include
-        if keyword == r"%file":
+        # ´include´ definition
+        if keyword == r"%include":
             if len(fields) < 2:
-                raise InvalidSyntaxError("'%file' keyword requires 1 argument.")
+                raise InvalidSyntaxError("'%include' keyword requires 1 argument.")
 
             if arguments[0].startswith("./"):
                 base_dir = Path(Path(filepath).resolve()).parent

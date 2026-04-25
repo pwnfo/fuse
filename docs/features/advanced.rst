@@ -8,9 +8,9 @@ For very complex generations, you can author ``.fuse`` files instead of invoking
 **Syntax Overview**
 
 - Comments start with ``#`` (it must be followed by a space to be interpreted as a comment).
-- ``%alias name pattern``: Replace ``$name;`` with ``pattern`` throughout the rest of the file.
-- ``%file filename.txt``: Expressly opens a file relative to the ``.fuse`` script or an absolute path.
-- **Important**: When you declare a ``%file``, that file is bound to the ``^`` placeholder in the **very next expression line**. It does not persist globally. You can declare multiple ``%file`` lines consecutively to bind to multiple ``^`` placeholders in the next expression.
+- ``%define name pattern``: Replace ``$name;`` with ``pattern`` throughout the rest of the file.
+- ``%include filename.txt``: Expressly opens a file relative to the ``.fuse`` script or an absolute path.
+- **Important**: When you declare a ``%include``, that file is bound to the ``^`` placeholder in the **very next expression line**. It does not persist globally. You can declare multiple ``%define`` lines consecutively to bind to multiple ``^`` placeholders in the next expression.
 - Any other (non-empty) line is treated as an expression.
 
 **Example payloads.fuse**:
@@ -18,11 +18,11 @@ For very complex generations, you can author ``.fuse`` files instead of invoking
 .. code-block:: text
 
    # Define Reusable Payload Aliases
-   %alias DIGIT #[0-9]
-   %alias BASE_URL (https://example.com/api/)
+   %define DIGIT #[0-9]
+   %define BASE_URL (https://example.com/api/)
    
    # Include a dictionary text file from previous runs
-   %file default_paths.txt
+   %include default_paths.txt
 
    # Expression Generation
    $BASE_URL;^\?id=$DIGIT; # Example: https://example.com/api/account?id=1

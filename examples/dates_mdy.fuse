@@ -4,25 +4,25 @@
 # ===============================
 # -- MM/DD/YYYY --
 
-%alias 31d 0#[1-9]
-%alias 31d-2 #[10-31]
+%define 31d 0#[1-9]
+%define 31d-2 #[10-31]
 
-%alias 30d 0#[1-9]
-%alias 30d-2 #[10-30]
+%define 30d 0#[1-9]
+%define 30d-2 #[10-30]
 
-%alias fev 020#[1-9]
-%alias fev-2 02#[10-29]
+%define fev 020#[1-9]
+%define fev-2 02#[10-29]
 
-%alias 31dm [01|03|05|07|08|10|12]
-%alias 30dm [04|06|09|11]
+%define 31dm [01|03|05|07|08|10|12]
+%define 30dm [04|06|09|11]
 
-%alias 31m $31dm;$31d;
-%alias 31m-2 $31dm;$31d-2;
+%define 31m $31dm;$31d;
+%define 31m-2 $31dm;$31d-2;
 
-%alias 30m $30dm;$30d;
-%alias 30m-2 $30dm;$30d-2;
+%define 30m $30dm;$30d;
+%define 30m-2 $30dm;$30d-2;
 
-%alias ye #[1800-2030]
+%define ye #[1800-2030]
 
 $fev;$ye;
 $fev-2;$ye;

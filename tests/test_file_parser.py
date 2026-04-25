@@ -25,27 +25,27 @@ class TestProcessExprFile:
         results = list(process_expr_file(str(fp)))
         assert len(results) == 2
 
-    def test_alias_expansion(self, fuse_expr_file_with_alias):
-        results = list(process_expr_file(str(fuse_expr_file_with_alias)))
+    def test_define_expansion(self, fuse_expr_file_with_define):
+        results = list(process_expr_file(str(fuse_expr_file_with_define)))
         assert len(results) == 1
         expr, files = results[0]
         assert "[0123456789]" in expr
 
-    def test_alias_invalid_raises(self, tmp_path):
-        fp = tmp_path / "bad_alias.fuse"
-        fp.write_text("%alias\n")
+    def test_define_invalid_raises(self, tmp_path):
+        fp = tmp_path / "bad_define.fuse"
+        fp.write_text("%define\n")
         with pytest.raises(InvalidSyntaxError, match="requires 2 arguments"):
             list(process_expr_file(str(fp)))
 
-    def test_alias_name_with_dollar_raises(self, tmp_path):
-        fp = tmp_path / "bad_alias2.fuse"
-        fp.write_text("%alias $name value\n")
+    def test_define_name_with_dollar_raises(self, tmp_path):
+        fp = tmp_path / "bad_define2.fuse"
+        fp.write_text("%define $name value\n")
         with pytest.raises(InvalidSyntaxError, match="cannot contain"):
             list(process_expr_file(str(fp)))
 
-    def test_alias_name_with_semicolon_raises(self, tmp_path):
-        fp = tmp_path / "bad_alias3.fuse"
-        fp.write_text("%alias na;me value\n")
+    def test_define_name_with_semicolon_raises(self, tmp_path):
+        fp = tmp_path / "bad_define3.fuse"
+        fp.write_text("%define na;me value\n")
         with pytest.raises(InvalidSyntaxError, match="cannot contain"):
             list(process_expr_file(str(fp)))
 
@@ -56,15 +56,15 @@ class TestProcessExprFile:
         assert len(files) == 1
         assert str(wordlist_file) in files[0]
 
-    def test_file_keyword_without_args_raises(self, tmp_path):
+    def test_include_keyword_without_args_raises(self, tmp_path):
         fp = tmp_path / "bad_file.fuse"
-        fp.write_text("%file\n[ab]\n")
+        fp.write_text("%include\n[ab]\n")
         with pytest.raises(InvalidSyntaxError, match="requires 1 argument"):
             list(process_expr_file(str(fp)))
 
-    def test_file_cleared_after_expr(self, tmp_path, wordlist_file):
+    def test_include_cleared_after_expr(self, tmp_path, wordlist_file):
         fp = tmp_path / "multi.fuse"
-        fp.write_text(f"%file {wordlist_file}\n^[ab]\n[12]\n")
+        fp.write_text(f"%include {wordlist_file}\n^[ab]\n[12]\n")
         results = list(process_expr_file(str(fp)))
         assert len(results) == 2
         # first expression has file, second does not
@@ -80,7 +80,7 @@ class TestProcessExprFile:
         words = tmp_path / "words.txt"
         words.write_text("hello\nworld\n")
         fp = tmp_path / "rel.fuse"
-        fp.write_text(f"%file ./words.txt\n^{{2}}\n")
+        fp.write_text(f"%include ./words.txt\n^{{2}}\n")
         results = list(process_expr_file(str(fp)))
         assert len(results) == 1
         _, files = results[0]
