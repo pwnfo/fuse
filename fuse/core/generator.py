@@ -4,7 +4,7 @@ from itertools import product
 from typing import Generator, Any
 
 from fuse.core.classes import pattern_repl
-from fuse.core.files import secure_open
+from fuse.files import secure_open
 
 
 class ExprError(Exception):

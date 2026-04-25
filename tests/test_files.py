@@ -1,7 +1,7 @@
 import sys
 import pytest
 
-from fuse.core.files import secure_open
+from fuse.files import secure_open
 
 
 class TestSecureOpen:
