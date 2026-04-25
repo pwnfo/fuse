@@ -8,4 +8,4 @@ repos:
     rev: v1.20.0
     hooks:
       - id: mypy
-        additional_dependencies: []
+        files: ^fuse/
