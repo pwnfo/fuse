@@ -57,12 +57,10 @@ def generate(
             log.error(f"invalid filter: {err}.")
             return 1
 
-        log.warning("[Warning] Filtering can discard words and reduce performance.")
+        log.warning("Filtering can discard words and reduce performance.")
 
     if options.threads > 1:
-        log.warning(
-            f"[Warning] Using multiple workers may result in interleaved output."
-        )
+        log.warning(f"Using multiple workers may result in interleaved output.")
 
     event = multiprocessing.Event()
     thread = multiprocessing.Process(
