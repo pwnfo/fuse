@@ -2,14 +2,15 @@
 # -*- coding: utf-8 -*-
 import re
 import sys
-import multiprocessing
+import tty
+import termios
 import signal
 import ctypes
+import multiprocessing
 
 from types import FrameType
 from dataclasses import dataclass
 from datetime import datetime
-from getpass import getpass
 from logging import ERROR
 from typing import Any
 from time import perf_counter
@@ -222,6 +223,40 @@ def generate(
     return 0
 
 
+def pause(prompt: str = "Press the Enter key to continue") -> bool:
+    if not sys.stdin.isatty():
+        return True
+
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+
+    try:
+        sys.stderr.write(prompt)
+        sys.stderr.flush()
+
+        tty.setraw(fd)
+
+        while True:
+            ch = sys.stdin.read(1)
+            if ch in ("\r", "\n"):
+                break
+            elif ch == "\x03":
+                raise KeyboardInterrupt
+
+        sys.stderr.write("\r\033[K")
+        sys.stderr.flush()
+
+        return True
+
+    except KeyboardInterrupt:
+        sys.stderr.write("\r\n")
+        sys.stderr.flush()
+        return False
+
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+
 def format_expression(expression: str, files: list[str]) -> tuple[str, list[str]]:
     n_files = 0
     files_out: list[str] = []
@@ -330,16 +365,8 @@ def main() -> int:
         log.error("Overflow Error! Is the expression correct?")
         return 1
 
-    if not args.quiet:
-        try:
-            getpass("Press [ENTER] to continue...")
-            sys.stdout.write("\033[F")
-            sys.stdout.write("\033[K")
-            sys.stdout.flush()
-        except KeyboardInterrupt:
-            sys.stdout.write("\n")
-            sys.stdout.flush()
-            return 0
+    if not args.quiet and not pause():
+        return 1
 
     stats = (s_bytes, s_words)
 
