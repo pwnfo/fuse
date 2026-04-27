@@ -18,6 +18,7 @@ Options
 * ``-o <path>, --output <path>``: Writes the generated wordlist reliably into a target file.
 * ``-f <path>, --file <path>``: Instead of an inline expression, runs a ``.fuse`` definition file.
 * ``-q, --quiet``: Disable progress bars and metric statistics. Great for `bash` pipes.
+* ``-n, --non-interactive``: Runs without interactive prompts.
 * ``-s <word>, --separator <word>``: Replaces the default newline (``\n``) separator with custom strings. Optional strings like ``\0`` can be used for zero-byte split integration.
 
 **Performance & Scaling**

@@ -95,6 +95,13 @@ def create_parser(prog: str = "fuse") -> FuseParser:
         help="filter generated words using a regex",
     )
     options.add_argument(
+        "-n",
+        "--non-interactive",
+        action="store_true",
+        dest="non_interactive",
+        help="disable interactive prompt before execution",
+    )
+    options.add_argument(
         "--from",
         metavar="<word>",
         dest="start",

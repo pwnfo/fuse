@@ -50,7 +50,7 @@ usage: fuse [options] <expression> [<files...>]
 | __|| | |/ _|| __|
 | _| | U |\_ \| _| 
 |_|  |___||__/|___|
-                    v2.1.0
+                    v3.1.2
 
   -h, --help            show this help message and exit
   -v, --version         show version message and exit
@@ -62,6 +62,8 @@ usage: fuse [options] <expression> [<files...>]
   -b, --buffer <bytes>  buffer size in wordlist generation
   -w, --workers <1-64>  number of workers (default is 1)
   -F, --filter <regex>  filter generated words using a regex
+  -n, --non-interactive
+                        disable interactive prompt before execution
   --from <word>         start writing the wordlist with <word>
   --to <word>           ends writing the wordlist with <word>
 

@@ -365,7 +365,7 @@ def main() -> int:
         log.error("Overflow Error! Is the expression correct?")
         return 1
 
-    if not args.quiet and not pause():
+    if not (args.quiet or args.non_interactive) and not pause():
         return 1
 
     stats = (s_bytes, s_words)
