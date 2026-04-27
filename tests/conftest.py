@@ -44,10 +44,10 @@ def fuse_expr_file(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def fuse_expr_file_with_alias(tmp_path: Path) -> Path:
+def fuse_expr_file_with_define(tmp_path: Path) -> Path:
     """Creates a fuse expression file with aliases."""
-    filepath = tmp_path / "alias.fuse"
-    filepath.write_text("%alias DIGITS [0123456789]\n$DIGITS;{2}\n", encoding="utf-8")
+    filepath = tmp_path / "define.fuse"
+    filepath.write_text("%define DIGITS [0123456789]\n$DIGITS;{2}\n", encoding="utf-8")
     return filepath
 
 
@@ -56,7 +56,7 @@ def fuse_expr_file_with_file_ref(tmp_path: Path, wordlist_file: Path) -> Path:
     """Creates a fuse expression file referencing an external file."""
     filepath = tmp_path / "fileref.fuse"
     filepath.write_text(
-        f"%file {wordlist_file}\n^[ab]\n",
+        f"%include {wordlist_file}\n^[ab]\n",
         encoding="utf-8",
     )
     return filepath
