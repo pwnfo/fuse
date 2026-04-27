@@ -31,6 +31,14 @@ class TestCreateParser:
         args = self.parser.parse_args(["[ab]"])
         assert args.quiet is False
 
+    def test_non_interactive_flag(self):
+        args = self.parser.parse_args(["-n", "[ab]"])
+        assert args.non_interactive is True
+
+    def test_non_interactive_default(self):
+        args = self.parser.parse_args(["[ab]"])
+        assert args.non_interactive is False
+
     def test_separator_option(self):
         args = self.parser.parse_args(["-s", ",", "[ab]"])
         assert args.separator == ","
