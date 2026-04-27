@@ -361,7 +361,7 @@ def main() -> int:
 
         log.info(f"Fuse v{__version__}")
         log.info(f"Fuse will generate {s_words} words (~{format_size(s_bytes)}).\n")
-    except OverflowError:
+    except (OverflowError, ValueError):
         log.error("Overflow Error! Is the expression correct?")
         return 1
 
