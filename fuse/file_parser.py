@@ -26,7 +26,7 @@ def process_expr_file(
     defines: list[tuple[str, str]] = []
     current_files: list[str] = []
 
-    log.info(f"opening file '{filepath}' (with {len(lines)} lines).")
+    log.info(f"Opening file '{filepath}' (with {len(lines)} lines).")
 
     for i, line in enumerate(lines):
         # expand defines
