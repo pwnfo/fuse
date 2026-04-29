@@ -2,7 +2,7 @@
   <br>
   <a href="https://github.com/pwnfo/fuse" target="_blank"><img src="images/icon.png" width="30%" alt="fuse"/></a>
   <br>
-  <span>Generate wordlists from concise expressions</span>
+  <span>Pattern-based wordlist generation tool</span>
   <br>
 </p>
 
