@@ -23,10 +23,14 @@
 > [!NOTE]  
 > It is **recommended** to install using `pipx` or `pip` for the PyPI version.
 
+> [!NOTE]  
+> The PyPI package has been renamed from `fuse-tool` to `fuse-generator`.
+
 | Method | Notes |
 | - | - |
-| `pipx install fuse-tool` | `pip` may be used in place of `pipx` |
+| `pipx install fuse-generator` | `pip` may be used in place of `pipx` |
 | `git clone https://github.com/pwnfo/fuse.git && cd fuse && pip install .` | Clone and install directly from GitHub |
+
 
 ## General usage
 
