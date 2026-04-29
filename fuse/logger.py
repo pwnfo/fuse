@@ -7,7 +7,7 @@ from typing import Any
 class FuseFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         if record.levelno == logging.WARNING:
-            return f"Warning :: {record.getMessage()}"
+            return f"Warning: {record.getMessage()}"
         return record.getMessage()
 
 
