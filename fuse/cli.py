@@ -162,9 +162,9 @@ def generate(
                     for worker in workers:
                         worker.join()
 
-                    log.warning("Generation stopped with keyboard interrupt!")
+                    log.error("Generation stopped with keyboard interrupt!")
 
-                    sys.exit(0)
+                    sys.exit(1)
 
                 signal.signal(signal.SIGINT, workers_shutdown)
 
@@ -204,7 +204,7 @@ def generate(
                             break
                 except KeyboardInterrupt:
                     stop_progress()
-                    log.warning("Generation stopped with keyboard interrupt!")
+                    log.error("Generation stopped with keyboard interrupt!")
 
                     return 1
         except Exception:
