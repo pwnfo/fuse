@@ -254,14 +254,12 @@ def pause(prompt: str = "Press the Enter key to continue") -> bool:
 
 
 def format_expression(expression: str, files: list[str]) -> tuple[str, list[str]]:
-    n_files = 0
     files_out: list[str] = []
 
     for file_path in files:
         if file_path.startswith("//"):
             inline = file_path.replace("//", "", 1)
             expression = re.sub(r"(?<!\\)\^", lambda m: inline, expression, count=1)
-            n_files += 1
         else:
             files_out.append(file_path)
 
