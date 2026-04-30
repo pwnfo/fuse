@@ -280,7 +280,7 @@ def main() -> int:
         parser.print_help(sys.stderr)
         return 1
 
-    if 64 < args.workers > 1:
+    if not (1 <= args.workers <= 64):
         log.error(
             f"invalid number of workers ({args.workers}). choose a value between 1 and 64."
         )
