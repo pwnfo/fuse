@@ -60,7 +60,7 @@ def generate(
         log.warning(f"Using multiple workers may result in interleaved output.")
 
     event = multiprocessing.Event()
-    thread = multiprocessing.Process(
+    progress_proc = multiprocessing.Process(
         target=get_progress, args=(event, progress), kwargs={"total": total_bytes}
     )
     show_progress_bar = (options.filename is not None) and (not options.quiet_mode)
@@ -75,7 +75,7 @@ def generate(
         start_token, end_token = options.wrange
 
         if show_progress_bar:
-            thread.start()
+            progress_proc.start()
 
         start_time = perf_counter()
 
@@ -83,7 +83,7 @@ def generate(
         def stop_progress() -> None:
             if show_progress_bar and not event.is_set():
                 event.set()
-                thread.join()
+                progress_proc.join()
 
         log.info(
             datetime.now().strftime(
@@ -210,8 +210,8 @@ def generate(
         elapsed = perf_counter() - start_time
         stop_progress()
 
-    if show_progress_bar and thread.is_alive():
-        thread.join()
+    if show_progress_bar and progress_proc.is_alive():
+        progress_proc.join()
 
     speed = int(total_words / elapsed) if elapsed > 0 else 0
     log.info(f"Finished in {format_time(elapsed)} ({speed} W/s).")
