@@ -36,17 +36,13 @@ class GenerateOptions:
     threads: int
 
 
-workers: list[multiprocessing.Process] = []
-
-
 def generate(
     generator: WordlistGenerator,
     nodes: list[Node],
     stats: tuple[int, int],
     options: GenerateOptions,
 ) -> int:
-    global workers
-
+    workers: list[multiprocessing.Process] = []
     progress = multiprocessing.Value(ctypes.c_longlong, 0)
     total_bytes, total_words = stats
 
