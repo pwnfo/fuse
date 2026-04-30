@@ -75,7 +75,7 @@ def create_parser(prog: str = "fuse") -> FuseParser:
         "--buffer",
         metavar="<bytes>",
         dest="buffer",
-        default="AUTO",
+        default=-1,
         help="buffer size in wordlist generation",
     )
     options.add_argument(

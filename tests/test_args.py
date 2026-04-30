@@ -53,7 +53,7 @@ class TestCreateParser:
 
     def test_buffer_default(self):
         args = self.parser.parse_args(["[ab]"])
-        assert args.buffer == "AUTO"
+        assert args.buffer == -1
 
     def test_workers_option(self):
         args = self.parser.parse_args(["-w", "4", "[ab]"])

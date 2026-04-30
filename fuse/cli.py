@@ -289,10 +289,11 @@ def main() -> int:
     if args.quiet:
         log.setLevel(ERROR)
 
-    buffer_size = -1
-    if args.buffer.upper() != "AUTO":
+    buffer_size = args.buffer
+
+    if isinstance(buffer_size, str):
         try:
-            buffer_size = parse_size(args.buffer)
+            buffer_size = parse_size(buffer_size)
             if buffer_size <= 0:
                 raise ValueError("the value cannot be <= 0")
         except ValueError as e:
