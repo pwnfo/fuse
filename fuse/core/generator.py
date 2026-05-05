@@ -12,6 +12,54 @@ class ExprError(Exception):
         super().__init__("expression error: " + message)
 
 
+class BindDefNode:
+    """Represents <@name=expr>: generates values from inner_nodes and stores each under name."""
+
+    __slots__ = ("name", "inner_nodes", "min_rep", "max_rep", "_cached_cardinality")
+
+    def __init__(
+        self, name: str, inner_nodes: list, min_rep: int = 1, max_rep: int = 1
+    ) -> None:
+        self.name = name
+        self.inner_nodes = inner_nodes
+        self.min_rep = min_rep
+        self.max_rep = max_rep
+        self._cached_cardinality: int | None = None
+
+    def __repr__(self) -> str:
+        return f"<BindDefNode name={self.name!r} {{{self.min_rep},{self.max_rep}}} inner={self.inner_nodes!r}>"
+
+    @property
+    def cardinality(self) -> int:
+        if self._cached_cardinality is not None:
+            return self._cached_cardinality
+        inner_card = 1
+        for n in self.inner_nodes:
+            inner_card *= n.cardinality
+        if self.min_rep == 1 and self.max_rep == 1:
+            total = inner_card
+        else:
+            total = 0
+            for r in range(self.min_rep, self.max_rep + 1):
+                total += 1 if r == 0 else inner_card**r
+        self._cached_cardinality = total
+        return total
+
+
+class BindRefNode:
+    """Represents <@name>: outputs the value previously stored under name."""
+
+    __slots__ = ("name", "min_rep", "max_rep")
+
+    def __init__(self, name: str, min_rep: int = 1, max_rep: int = 1) -> None:
+        self.name = name
+        self.min_rep = min_rep
+        self.max_rep = max_rep
+
+    def __repr__(self) -> str:
+        return f"<BindRefNode name={self.name!r} {{{self.min_rep},{self.max_rep}}}>"
+
+
 class Node:
     __slots__ = ("base", "min_rep", "max_rep", "_sum_len", "_cached_cardinality")
 
@@ -372,6 +420,43 @@ class WordlistGenerator:
             i += 1
         return -1
 
+    def _find_binding_close(self, s: str, start: int) -> int:
+        """Find the closing '>' of a <@...> binding, correctly skipping nested brackets."""
+        i = start
+        n = len(s)
+        depth_square = 0
+        depth_paren = 0
+        depth_brace = 0
+        while i < n:
+            ch = s[i]
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == "[":
+                depth_square += 1
+            elif ch == "]":
+                if depth_square > 0:
+                    depth_square -= 1
+            elif ch == "(":
+                depth_paren += 1
+            elif ch == ")":
+                if depth_paren > 0:
+                    depth_paren -= 1
+            elif ch == "{":
+                depth_brace += 1
+            elif ch == "}":
+                if depth_brace > 0:
+                    depth_brace -= 1
+            elif (
+                ch == ">"
+                and depth_square == 0
+                and depth_paren == 0
+                and depth_brace == 0
+            ):
+                return i
+            i += 1
+        return -1
+
     def _parse_range(self, pattern: str, start_idx: int) -> tuple[list[str], int]:
         end_pos = self._find_closing(pattern, start_idx, "]")
         if end_pos == -1:
@@ -433,8 +518,8 @@ class WordlistGenerator:
             raise ExprError("invalid character class contents.")
         return choices, end_pos + 1
 
-    def tokenize(self, pattern: str) -> list[tuple[str, Any]]:
-        pattern = pattern_repl(pattern)
+    def _tokenize_raw(self, pattern: str) -> list[tuple[str, Any]]:
+        """Core tokenization loop (pattern_repl must already have been applied)."""
         i = 0
         n = len(pattern)
         tokens: list[tuple[str, Any]] = []
@@ -447,6 +532,30 @@ class WordlistGenerator:
                     raise ExprError("invalid escape: ends with backslash.")
                 tokens.append(("LIT", pr[i + 1]))
                 i += 2
+                continue
+            if c == "<":
+                if i + 1 < n and pr[i + 1] == "@":
+                    end = self._find_binding_close(pr, i + 2)
+                    if end == -1:
+                        raise ExprError("unclosed binding: missing '>'.")
+                    inner = pr[i + 2 : end]
+                    eq_pos = inner.find("=")
+                    if eq_pos == -1:
+                        name = inner.strip()
+                        if not name.isidentifier():
+                            raise ExprError(f"invalid binding name: {name!r}.")
+                        tokens.append(("BIND_REF", name))
+                    else:
+                        name = inner[:eq_pos].strip()
+                        expr = inner[eq_pos + 1 :]
+                        if not name.isidentifier():
+                            raise ExprError(f"invalid binding name: {name!r}.")
+                        inner_tokens = self._tokenize_raw(expr)
+                        tokens.append(("BIND_DEF", (name, inner_tokens)))
+                    i = end + 1
+                    continue
+                tokens.append(("LIT", "<"))
+                i += 1
                 continue
             if c == "#":
                 if i + 1 < n and pr[i + 1] == "[":
@@ -491,30 +600,17 @@ class WordlistGenerator:
             i += 1
         return tokens
 
-    def parse(
-        self, tokens: list[tuple[str, Any]], files: list[str] | None = None
-    ) -> list[Node | FileNode]:
-        nodes: list[Node | FileNode] = []
-        count_ft = 0
-        for t, _ in tokens:
-            if t == "FILE":
-                count_ft += 1
-        if count_ft:
-            if not files:
-                raise ExprError("pattern requires files but none provided.")
-            if len(files) < 1:
-                raise ExprError("files list is empty.")
-            if count_ft == 1:
-                file_groups = [files]
-            else:
-                if len(files) < count_ft:
-                    raise ExprError(
-                        f"pattern requires {count_ft} files, {len(files)} provided."
-                    )
-                file_groups = [[f] for f in files[:count_ft]]
-        else:
-            file_groups = []
-        file_idx = 0
+    def tokenize(self, pattern: str) -> list[tuple[str, Any]]:
+        return self._tokenize_raw(pattern_repl(pattern))
+
+    def _parse_tokens(
+        self,
+        tokens: list[tuple[str, Any]],
+        file_groups: list[list[str]],
+        file_idx: int,
+    ) -> tuple[list, int]:
+        """Parse a flat token list into nodes, returning (nodes, updated_file_idx)."""
+        nodes: list = []
         i = 0
         length = len(tokens)
         while i < length:
@@ -536,30 +632,122 @@ class WordlistGenerator:
                     raise ExprError("insufficient file assignments.")
                 nodes.append(FileNode(file_groups[file_idx], min_rep, max_rep))
                 file_idx += 1
+            elif kind == "BIND_DEF":
+                name, inner_tokens = val
+                inner_nodes, file_idx = self._parse_tokens(
+                    inner_tokens, file_groups, file_idx
+                )
+                nodes.append(BindDefNode(name, inner_nodes, min_rep, max_rep))
+            elif kind == "BIND_REF":
+                nodes.append(BindRefNode(val, min_rep, max_rep))
             else:
                 raise ExprError(f"unexpected token: {kind}")
             i += 1
+        return nodes, file_idx
+
+    def _count_file_tokens(self, tokens: list[tuple[str, Any]]) -> int:
+        """Recursively count FILE tokens, including those inside BIND_DEF inner_tokens."""
+        count = 0
+        for kind, val in tokens:
+            if kind == "FILE":
+                count += 1
+            elif kind == "BIND_DEF":
+                _, inner_tokens = val
+                count += self._count_file_tokens(inner_tokens)
+        return count
+
+    def parse(
+        self, tokens: list[tuple[str, Any]], files: list[str] | None = None
+    ) -> list:
+        count_ft = self._count_file_tokens(tokens)
+        if count_ft:
+            if not files:
+                raise ExprError("pattern requires files but none provided.")
+            if count_ft == 1:
+                file_groups: list[list[str]] = [files]
+            else:
+                if len(files) < count_ft:
+                    raise ExprError(
+                        f"pattern requires {count_ft} files, {len(files)} provided."
+                    )
+                file_groups = [[f] for f in files[:count_ft]]
+        else:
+            file_groups = []
+        nodes, _ = self._parse_tokens(tokens, file_groups, 0)
         return nodes
 
     def _combine_resume(
-        self, nodes: list[Node], idx: int, start_from: str | None
+        self,
+        nodes: list,
+        idx: int,
+        start_from: str | None,
+        bindings: dict[str, str] | None = None,
     ) -> Generator[str, None, None]:
-        """recursive word combination generator with resume logic."""
+        """recursive word combination generator with resume logic and binding support."""
+        if bindings is None:
+            bindings = {}
         ln = len(nodes)
         if idx >= ln:
             if not start_from:
                 yield ""
             return
         cur = nodes[idx]
+
+        if isinstance(cur, BindDefNode):
+            inner_vals: list[str]
+            if cur.min_rep == 1 and cur.max_rep == 1:
+                inner_vals_gen = self._combine_resume(cur.inner_nodes, 0, None, {})
+            else:
+                base_vals = list(self._combine_resume(cur.inner_nodes, 0, None, {}))
+
+                def _rep_gen(
+                    base: list[str], mn: int, mx: int
+                ) -> Generator[str, None, None]:
+                    for r in range(mn, mx + 1):
+                        if r == 0:
+                            yield ""
+                        else:
+                            for combo in product(base, repeat=r):
+                                yield "".join(combo)
+
+                inner_vals_gen = _rep_gen(base_vals, cur.min_rep, cur.max_rep)
+            for val in inner_vals_gen:
+                new_bindings = {**bindings, cur.name: val}
+                for suffix in self._combine_resume(
+                    nodes, idx + 1, start_from, new_bindings
+                ):
+                    yield val + suffix
+            return
+
+        if isinstance(cur, BindRefNode):
+            if cur.name not in bindings:
+                raise ExprError(f"undefined variable '{cur.name}'.")
+            val_base = bindings[cur.name]
+            for r in range(cur.min_rep, cur.max_rep + 1):
+                val = val_base * r if r > 0 else ""
+                if start_from is None:
+                    next_target = None
+                elif start_from.startswith(val):
+                    next_target = start_from[len(val) :]
+                elif val.startswith(start_from):
+                    next_target = None
+                else:
+                    continue
+                for suffix in self._combine_resume(
+                    nodes, idx + 1, next_target, bindings
+                ):
+                    yield val + suffix
+            return
+
         if start_from is None:
             for part in cur.expand():
-                for suffix in self._combine_resume(nodes, idx + 1, None):
+                for suffix in self._combine_resume(nodes, idx + 1, None, bindings):
                     yield part + suffix
             return
 
         for part, remainder, is_full_mode in cur.expand_resume(start_from):
             next_target = None if is_full_mode else remainder
-            for suffix in self._combine_resume(nodes, idx + 1, next_target):
+            for suffix in self._combine_resume(nodes, idx + 1, next_target, bindings):
                 yield part + suffix
 
     def generate(
@@ -623,7 +811,7 @@ class WordlistGenerator:
 
     def stats(
         self,
-        nodes: list[Node | FileNode],
+        nodes: list,
         delimiter_len: int = 1,
         start_from: str | None = None,
         end: str | None = None,
@@ -631,40 +819,62 @@ class WordlistGenerator:
         """calculates wordlist stats, adjusted for start_from and end range."""
         total_count = 1
         total_bytes = 0
+        binding_stats: dict[str, tuple[int, int]] = {}
 
         # calculate absolute total
         for node in nodes:
-            if isinstance(node, FileNode):
+            if isinstance(node, BindDefNode):
+                inner_bytes, inner_count = self.stats(node.inner_nodes, delimiter_len=0)
+                node_count = inner_count
+                node_bytes = inner_bytes
+                avg_len = inner_bytes // inner_count if inner_count > 0 else 0
+                binding_stats[node.name] = (inner_count, avg_len)
+            elif isinstance(node, BindRefNode):
+                if node.name not in binding_stats:
+                    raise ExprError(f"undefined variable '{node.name}'.")
+                _, avg_len = binding_stats[node.name]
+                node_count = 1
+                node_bytes = avg_len
+            elif isinstance(node, FileNode):
                 k, sum_len = node.stats_info()
+                node_count = 0
+                node_bytes = 0
+                min_r = node.min_rep
+                max_r = node.max_rep
+                if min_r == 0 and max_r == 0:
+                    node_count = 1
+                    node_bytes = 0
+                else:
+                    for r in range(min_r, max_r + 1):
+                        if r == 0:
+                            node_count += 1
+                        else:
+                            node_count += k**r
+                            node_bytes += r * (k ** (r - 1)) * sum_len
             else:
                 choices = node.base
                 k = len(choices)
                 cached = node._sum_len
                 if cached is None:
-                    s = 0
-                    for s_item in choices:
-                        s += len(str(s_item).encode("utf-8"))
+                    s = sum(len(str(s_item).encode("utf-8")) for s_item in choices)
                     node._sum_len = s
                     sum_len = s
                 else:
                     sum_len = cached
-            node_count = 0
-            node_bytes = 0
-            min_r = node.min_rep
-            max_r = node.max_rep
-            if min_r == 0 and max_r == 0:
-                node_count = 1
+                node_count = 0
                 node_bytes = 0
-            else:
-                for r in range(min_r, max_r + 1):
-                    if r == 0:
-                        term_count = 1
-                        term_bytes = 0
-                    else:
-                        term_count = k**r
-                        term_bytes = r * (k ** (r - 1)) * sum_len
-                    node_count += term_count
-                    node_bytes += term_bytes
+                min_r = node.min_rep
+                max_r = node.max_rep
+                if min_r == 0 and max_r == 0:
+                    node_count = 1
+                    node_bytes = 0
+                else:
+                    for r in range(min_r, max_r + 1):
+                        if r == 0:
+                            node_count += 1
+                        else:
+                            node_count += k**r
+                            node_bytes += r * (k ** (r - 1)) * sum_len
             total_count, total_bytes = total_count * node_count, (
                 total_bytes * node_count
             ) + (node_bytes * total_count)

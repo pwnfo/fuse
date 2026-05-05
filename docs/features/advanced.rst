@@ -71,3 +71,75 @@ Generate the superset pattern and then redirect or filter it using ``-F "REGEX"`
    $ fuse '[/l/d]{3}' -F '^(3|5)'
 
 *Warning: Filtering evaluates dynamically, meaning permutations discarded incur minor performance penalties due to skipped outputs.*
+
+Value Bindings
+--------------
+Value bindings let you evaluate an expression **once per output line** and reuse the result any number of times within that line.
+Without bindings, two tokens always expand via cartesian product.
+With bindings, a definition and its references share the same drawn value — no additional combinations are introduced.
+
+**Syntax Overview**
+
+- ``<@name=expr>`` — evaluate ``expr``, store the result under ``name``, and output it.
+- ``<@name>`` — output the value previously stored under ``name``.
+
+``name`` must be a valid Python identifier. Referencing a name before it is defined raises an error.
+
+**Basic example**
+
+.. code-block:: bash
+
+   $ fuse '<@d=/d>-<@d>'
+   0-0
+   1-1
+   ...
+   9-9
+
+Naively writing ``/d-/d`` would produce 100 lines (cartesian product of two independent digits).
+With a binding, the digit is picked once and reused — 10 lines.
+
+**File placeholders inside bindings**
+
+The ``^`` placeholder works inside ``<@name=^>``:
+
+.. code-block:: bash
+
+   $ fuse '<@x=^>:<@x>' words.txt
+   # apple:apple
+   # banana:banana
+
+**Repetition on bindings**
+
+Quantifiers ``{N}``, ``{min,max}``, and ``?`` work on both definitions and references.
+
+*Repetition on the definition* — the inner expression is repeated N times before being stored:
+
+.. code-block:: bash
+
+   $ fuse '<@n=/d{2}>_<@n>'
+   00_00
+   01_01
+   ...
+   99_99
+
+*Repetition on the reference* — the stored value is repeated N times in-place:
+
+.. code-block:: bash
+
+   $ fuse '<@d=/d>_<@d>{2}'
+   0_00
+   1_11
+   ...
+   9_99
+
+**Multiple bindings**
+
+Each ``<@name=expr>`` is independent. Their values are combined via cartesian product with each other, but each pair of ``<@name=expr>`` / ``<@name>`` is internally consistent:
+
+.. code-block:: bash
+
+   $ fuse '<@a=[01]><@b=[xy]><@a><@b>'
+   0x0x
+   0y0y
+   1x1x
+   1y1y

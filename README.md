@@ -143,6 +143,22 @@ $ fuse "^-^" names.txt years.txt
 
 Prefix a filename with `//` to treat it as an inline expression instead of a file path.
 
+### Value bindings
+
+Use `<@name=expr>` to evaluate an expression **once per output line** and store it, then reuse it with `<@name>`.
+Unlike concatenation, this introduces a dependency, so no cartesian product is created between the definition and its references.
+
+```bash
+$ fuse '<@d=/d>-<@d>'
+# output: 0-0, 1-1, ..., 9-9
+
+$ fuse '<@x=^>:<@x>' words.txt
+# output: foo:foo, bar:bar, ...
+
+$ fuse '<@n=/d{2}>_<@n>'
+# output: 00_00, 01_01, ..., 99_99
+```
+
 ### Compression
 
 Fuse supports on-the-fly compression when writing output files.

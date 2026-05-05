@@ -1,7 +1,14 @@
 import pytest
 
 from pathlib import Path
-from fuse.core.generator import ExprError, Node, FileNode, WordlistGenerator
+from fuse.core.generator import (
+    ExprError,
+    Node,
+    FileNode,
+    WordlistGenerator,
+    BindDefNode,
+    BindRefNode,
+)
 
 
 class TestNode:
@@ -484,3 +491,94 @@ class TestCalculateSkippedCount:
         tokens = self.gen.tokenize("[ab][12]")
         nodes = self.gen.parse(tokens)
         assert self.gen._calculate_skipped_count(nodes, "b2") == 3
+
+
+class TestBinding:
+    def setup_method(self):
+        self.gen = WordlistGenerator()
+
+    def _gen(self, expression, **kwargs):
+        tokens = self.gen.tokenize(expression)
+        nodes = self.gen.parse(tokens)
+        return list(self.gen.generate(nodes, **kwargs))
+
+    def test_basic_digit_binding(self):
+        result = self._gen("<@d=/d>-<@d>")
+        assert result == [f"{i}-{i}" for i in range(10)]
+
+    def test_binding_with_class(self):
+        result = self._gen("<@x=[ab]>-<@x>")
+        assert result == ["a-a", "b-b"]
+
+    def test_binding_stats_not_cartesian(self):
+        tokens = self.gen.tokenize("<@d=/d>-<@d>")
+        nodes = self.gen.parse(tokens)
+        _, words = self.gen.stats(nodes)
+        assert words == 10
+
+    def test_binding_with_surrounding_literals(self):
+        result = self._gen("pre-<@d=[ab]>-<@d>-suf")
+        assert result == ["pre-a-a-suf", "pre-b-b-suf"]
+
+    def test_two_independent_bindings(self):
+        result = self._gen("<@a=[01]><@b=[xy]><@a><@b>")
+        assert result == ["0x0x", "0y0y", "1x1x", "1y1y"]
+
+    def test_undefined_ref_in_generate_raises(self):
+        tokens = self.gen.tokenize("<@x>")
+        nodes = self.gen.parse(tokens)
+        with pytest.raises(ExprError, match="undefined variable"):
+            list(self.gen.generate(nodes))
+
+    def test_undefined_ref_in_stats_raises(self):
+        tokens = self.gen.tokenize("<@x>")
+        nodes = self.gen.parse(tokens)
+        with pytest.raises(ExprError, match="undefined variable"):
+            self.gen.stats(nodes)
+
+    def test_tokenize_bind_def_produces_correct_token(self):
+        tokens = self.gen.tokenize("<@v=[abc]>")
+        assert len(tokens) == 1
+        kind, val = tokens[0]
+        assert kind == "BIND_DEF"
+        name, inner_tokens = val
+        assert name == "v"
+
+    def test_tokenize_bind_ref_produces_correct_token(self):
+        tokens = self.gen._tokenize_raw("<@v>")
+        assert tokens == [("BIND_REF", "v")]
+
+    def test_parse_creates_bind_def_node(self):
+        tokens = self.gen.tokenize("<@d=/d>")
+        nodes = self.gen.parse(tokens)
+        assert len(nodes) == 1
+        assert isinstance(nodes[0], BindDefNode)
+        assert nodes[0].name == "d"
+
+    def test_parse_creates_bind_ref_node(self):
+        tokens = self.gen.tokenize("<@d=/d><@d>")
+        nodes = self.gen.parse(tokens)
+        assert len(nodes) == 2
+        assert isinstance(nodes[1], BindRefNode)
+        assert nodes[1].name == "d"
+
+    def test_unclosed_binding_raises(self):
+        with pytest.raises(ExprError, match="unclosed binding"):
+            self.gen.tokenize("<@d=/d")
+
+    def test_invalid_binding_name_raises(self):
+        with pytest.raises(ExprError, match="invalid binding name"):
+            self.gen.tokenize("<@123=abc>")
+
+    def test_literal_lt_without_at_is_literal(self):
+        tokens = self.gen._tokenize_raw("<hello>")
+        assert tokens[0] == ("LIT", "<")
+
+    def test_bind_def_cardinality(self):
+        tokens = self.gen.tokenize("<@d=/d>")
+        nodes = self.gen.parse(tokens)
+        assert nodes[0].cardinality == 10
+
+    def test_reuse_with_numeric_range(self):
+        result = self._gen("<@n=#[1-3]>/<@n>")
+        assert result == ["1/1", "2/2", "3/3"]
