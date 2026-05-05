@@ -93,6 +93,7 @@ $ fuse "/l{2,3}"
 | `/a`   | lowercase letters (a–z)          |
 | `/A`   | uppercase letters (A–Z)          |
 | `/d`   | digits (0–9)                     |
+| `/D`   | non-zero digits (1–9)            |
 | `/h`   | lowercase hexadecimal (0–9, a–f) |
 | `/H`   | uppercase hexadecimal (0–9, A–F) |
 | `/s`   | space                            |
