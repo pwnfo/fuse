@@ -19,15 +19,17 @@ Options
 * ``-f <path>, --file <path>``: Instead of an inline expression, runs a ``.fuse`` definition file.
 * ``-q, --quiet``: Disable progress bars and metric statistics. Great for `bash` pipes.
 * ``-n, --non-interactive``: Runs without interactive prompts.
-* ``-s <word>, --separator <word>``: Replaces the default newline (``\n``) separator with custom strings. Optional strings like ``\0`` can be used for zero-byte split integration.
+* ``-d <word>, --delimiter <word>``: Replaces the default newline (``\n``) delimiter with custom strings. Optional strings like ``\0`` can be used for zero-byte split integration.
 
 **Performance & Scaling**
 
-* ``-b <bytes>, --buffer <bytes>``: Explicitly sets chunk buffer targets (e.g. ``50MB``, ``1GB``) for IO optimization.
+* ``-b <bytes>, --write-buffer <bytes>``: Explicitly sets write buffer size (e.g. ``50MB``, ``1GB``) for IO optimization.
 * ``-w <1-64>, --workers <1-64>``: Distributes combinatorial operations across ``N`` processes. Default is 1.
+* ``-k <bytes>, --flush-threshold <bytes>``: Sets byte threshold before flushing output buffer. Default is 512KB.
+* ``-z <format>, --compress <format>``: Compress output using specified format. Available: ``gzip``, ``bzip2``, ``lzma``.
 
-**Filtration**
+**Filtration & Range**
 
 * ``-F <regex>, --filter <regex>``: Pre-evaluates tokens using standard Python regex before outputting.
-* ``--from <word>``: Starts writing specifically from ``<word>`` forward.
-* ``--to <word>``: Caps execution explicitly ending precisely on ``<word>``.
+* ``-S <word>, --start <word>``: Starts writing specifically from ``<word>`` forward.
+* ``-E <word>, --end <word>``: Stops execution, ending precisely on ``<word>``.

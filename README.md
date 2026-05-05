@@ -145,6 +145,20 @@ $ fuse "^-^" names.txt years.txt
 
 Prefix a filename with `//` to treat it as an inline expression instead of a file path.
 
+### Compression
+
+Fuse supports on-the-fly compression when writing output files.
+
+```bash
+# gzip (fast, balanced)
+fuse "/l{5}" -z gzip -o wordlist.txt.gz
+
+# lzma (best compression)
+fuse "/l{5}" -z lzma -o wordlist.txt.xz
+
+# bzip2 (middle ground)
+fuse "/l{5}" -z bzip2 -o wordlist.txt.bz2
+
 ### Escaping special characters
 
 Use `\` to escape special characters.

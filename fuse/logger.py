@@ -5,6 +5,8 @@ from typing import Any
 
 
 class FuseFormatter(logging.Formatter):
+    """Uses the 'Warning:' prefix"""
+
     def format(self, record: logging.LogRecord) -> str:
         if record.levelno == logging.WARNING:
             return f"Warning: {record.getMessage()}"
@@ -12,6 +14,8 @@ class FuseFormatter(logging.Formatter):
 
 
 class FuseStreamHandler(logging.StreamHandler):
+    """Writes warnings and errors to `sys.stderr`"""
+
     def emit(self, record: logging.LogRecord) -> Any:
         if record.levelno < logging.WARNING:
             self.stream = sys.stdout
@@ -33,4 +37,4 @@ def setup_logger() -> logging.Logger:
     return log
 
 
-log = setup_logger()
+log = setup_logger()  # main log

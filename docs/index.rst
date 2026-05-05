@@ -18,6 +18,7 @@ Fuse is a blazing fast and robust wordlist generator that parses character class
 
    features/expressions
    features/ranges_files
+   features/compression
    features/advanced
 
 .. toctree::

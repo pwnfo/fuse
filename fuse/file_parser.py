@@ -3,8 +3,7 @@ import re
 from pathlib import Path
 from typing import Iterator
 
-from fuse.logger import log
-from fuse.files import secure_open
+from fuse.files import fuse_open
 
 
 class InvalidSyntaxError(Exception):
@@ -17,7 +16,11 @@ class InvalidSyntaxError(Exception):
 def process_expr_file(
     filepath: str,
 ) -> Iterator[tuple[str, list[str]]]:
-    with secure_open(filepath, "r", encoding="utf-8") as fp:
+    """
+    Yields the lines of the expression file (`filepath`) to be processed
+    with included files. Handles keywords (`%define` and `%include`).
+    """
+    with fuse_open(filepath, "r", encoding="utf-8") as fp:
         if fp is None:
             return
 
@@ -25,8 +28,6 @@ def process_expr_file(
 
     defines: list[tuple[str, str]] = []
     current_files: list[str] = []
-
-    log.info(f"Opening file '{filepath}' (with {len(lines)} lines).")
 
     for i, line in enumerate(lines):
         # expand defines
@@ -57,8 +58,10 @@ def process_expr_file(
             if len(fields) < 2:
                 raise InvalidSyntaxError("'%include' keyword requires 1 argument.")
 
-            if arguments[0].startswith("./"):
-                base_dir = Path(Path(filepath).resolve()).parent
+            # gets inclusions relative to the expression file
+            # if the path starts with "./" or "../".
+            if arguments[0].startswith("./") or arguments[0].startswith("../"):
+                base_dir = Path(filepath).resolve().parent
                 file = str((base_dir / " ".join(arguments).strip()).resolve())
             else:
                 file = " ".join(arguments).strip()

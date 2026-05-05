@@ -1,5 +1,6 @@
 CHAR_CLASSES: dict[str, str] = {
     "d": "0123456789",
+    "D": "123456789",
     "h": "0123456789abcdef",
     "H": "0123456789ABCDEF",
     "a": "abcdefghijklmnopqrstuvwxyz",
@@ -8,12 +9,12 @@ CHAR_CLASSES: dict[str, str] = {
     "o": "01234567",
     "p": "!@#$%^&*()-_+=",
     "l": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
-    "N": "\n",
+    "b": "\n",
 }
 
 
 def pattern_repl(pattern: str, wc: str = "/") -> str:
-    """Replace character-class shortcuts"""
+    """Replace character class shortcuts"""
     out: list[str] = []
     i = 0
     n = len(pattern)

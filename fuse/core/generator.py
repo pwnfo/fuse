@@ -4,7 +4,7 @@ from itertools import product
 from typing import Generator, Any
 
 from fuse.core.classes import pattern_repl
-from fuse.files import secure_open
+from fuse.files import fuse_open
 
 
 class ExprError(Exception):
@@ -231,7 +231,7 @@ class FileNode(Node):
         out: list[str] = []
         for path in self.base:
             try:
-                with secure_open(path, "r", encoding="utf-8", errors="ignore") as fp:
+                with fuse_open(path, "r", encoding="utf-8", errors="ignore") as fp:
                     if not fp:
                         raise IOError
                     out.extend(ln.rstrip("\n\r") for ln in fp)
@@ -624,7 +624,7 @@ class WordlistGenerator:
     def stats(
         self,
         nodes: list[Node | FileNode],
-        sep_len: int = 1,
+        delimiter_len: int = 1,
         start_from: str | None = None,
         end: str | None = None,
     ) -> tuple[int, int]:
@@ -669,7 +669,7 @@ class WordlistGenerator:
                 total_bytes * node_count
             ) + (node_bytes * total_count)
 
-        full_total_bytes = int(total_bytes + (sep_len * total_count))
+        full_total_bytes = int(total_bytes + (delimiter_len * total_count))
         full_total_count = int(total_count)
 
         if not start_from and not end:

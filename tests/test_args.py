@@ -39,13 +39,13 @@ class TestCreateParser:
         args = self.parser.parse_args(["[ab]"])
         assert args.non_interactive is False
 
-    def test_separator_option(self):
-        args = self.parser.parse_args(["-s", ",", "[ab]"])
-        assert args.separator == ","
+    def test_delimiter_option(self):
+        args = self.parser.parse_args(["-d", ",", "[ab]"])
+        assert args.delimiter == ","
 
-    def test_separator_default(self):
+    def test_delimiter_default(self):
         args = self.parser.parse_args(["[ab]"])
-        assert args.separator == "\n"
+        assert args.delimiter == "\n"
 
     def test_buffer_option(self):
         args = self.parser.parse_args(["-b", "4KB", "[ab]"])
@@ -67,12 +67,16 @@ class TestCreateParser:
         args = self.parser.parse_args(["-F", "^a", "[ab]"])
         assert args.filter == "^a"
 
-    def test_from_option(self):
-        args = self.parser.parse_args(["--from", "abc", "[ab]"])
+    def test_compresslevel_option(self):
+        args = self.parser.parse_args(["-l", "5", "[ab]"])
+        assert args.compresslevel == 5
+
+    def test_start_option(self):
+        args = self.parser.parse_args(["-S", "abc", "[ab]"])
         assert args.start == "abc"
 
-    def test_to_option(self):
-        args = self.parser.parse_args(["--to", "xyz", "[ab]"])
+    def test_end_option(self):
+        args = self.parser.parse_args(["-E", "xyz", "[ab]"])
         assert args.end == "xyz"
 
     def test_file_option(self):

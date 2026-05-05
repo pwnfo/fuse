@@ -46,33 +46,41 @@ class TestGenerateOptions:
             filename=None,
             buffering=-1,
             quiet_mode=False,
-            separator="\n",
+            delimiter="\n",
             wrange=(None, None),
             filter=None,
             threads=1,
+            flush_limit=512 * 1024,
+            compresslevel=None,
         )
         assert opts.filename is None
         assert opts.buffering == -1
         assert opts.quiet_mode is False
-        assert opts.separator == "\n"
+        assert opts.delimiter == "\n"
         assert opts.wrange == (None, None)
         assert opts.filter is None
         assert opts.threads == 1
+        assert opts.flush_limit == 512 * 1024
+        assert opts.compresslevel == None
 
     def test_with_values(self):
         opts = GenerateOptions(
             filename="out.txt",
             buffering=4096,
             quiet_mode=True,
-            separator=",",
+            delimiter=",",
             wrange=("a", "z"),
             filter="^[a-z]+$",
             threads=4,
+            flush_limit=256 * 1024,
+            compresslevel=5,
         )
         assert opts.filename == "out.txt"
         assert opts.buffering == 4096
         assert opts.quiet_mode is True
-        assert opts.separator == ","
+        assert opts.delimiter == ","
         assert opts.wrange == ("a", "z")
         assert opts.filter == "^[a-z]+$"
         assert opts.threads == 4
+        assert opts.flush_limit == 256 * 1024
+        assert opts.compresslevel == 5

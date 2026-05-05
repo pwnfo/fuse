@@ -421,9 +421,9 @@ class TestStats:
         _, total_words = self._stats("[ab]?")
         assert total_words == 3
 
-    def test_sep_len_affects_bytes(self):
-        b1, _ = self._stats("[ab]", sep_len=1)
-        b2, _ = self._stats("[ab]", sep_len=5)
+    def test_delimiter_len_affects_bytes(self):
+        b1, _ = self._stats("[ab]", delimiter_len=1)
+        b2, _ = self._stats("[ab]", delimiter_len=5)
         assert b2 > b1
 
     def test_stats_with_start_from(self):

@@ -38,17 +38,21 @@ Smart Skipping & Chunking
 -------------------------
 Large permutations quickly hit constraints. Fuse addresses this through algorithmic seeking. Instead of creating combinations starting from `A` waiting until it hits your target, Fuse calculates precisely where a specific target begins and resumes generation from there optimally.
 
-You can segment workloads using ``--from`` and ``--to``.
+You can segment workloads using ``-S/--start`` and ``-E/--end``.
 
 .. code-block:: bash
 
-   $ fuse '/l{8}' --from abcd --to wxyz
+   $ fuse '/l{4}' -S abcd -E wxyz
+   abce
+   abcf
+   ...
+   wxyz
 
 This logic applies cleanly natively even when distributing across threads.
 
 Multi-threading
 ---------------------------
-You can specify multiple workers via ``-w <1-64>``. 
+You can specify multiple workers via ``-w <int>``. 
 Fuse intelligently delegates disjoint segments of the permutation space to each worker.
 
 .. code-block:: bash

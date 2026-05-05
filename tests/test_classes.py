@@ -7,6 +7,9 @@ class TestCharClasses:
     def test_digits(self):
         assert CHAR_CLASSES["d"] == "0123456789"
 
+    def test_non_zero_digits(self):
+        assert CHAR_CLASSES["D"] == "123456789"
+
     def test_hex_lower(self):
         assert CHAR_CLASSES["h"] == "0123456789abcdef"
 
@@ -34,7 +37,7 @@ class TestCharClasses:
         )
 
     def test_newline(self):
-        assert CHAR_CLASSES["N"] == "\n"
+        assert CHAR_CLASSES["b"] == "\n"
 
 
 class TestPatternReplOutsideBrackets:

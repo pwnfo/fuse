@@ -26,6 +26,7 @@ Symbol    Meaning                  Example / Resulting Output
 ``/a``    Lowercase letters        ``a–z``
 ``/A``    Uppercase letters        ``A–Z``
 ``/d``    Digits                   ``0–9``
+``/D``    Non-zero digits          ``1–9``
 ``/h``    Hexadecimal (lower)      ``0–9``, ``a–f``
 ``/H``    Hexadecimal (upper)      ``0–9``, ``A–F``
 ``/s``    Whitespace               `` `` (Space)
