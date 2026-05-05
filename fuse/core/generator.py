@@ -59,6 +59,11 @@ class BindRefNode:
     def __repr__(self) -> str:
         return f"<BindRefNode name={self.name!r} {{{self.min_rep},{self.max_rep}}}>"
 
+    @property
+    def cardinality(self) -> int:
+        """Number of distinct outputs (one per repetition count in [min_rep, max_rep])."""
+        return self.max_rep - self.min_rep + 1
+
 
 class Node:
     __slots__ = ("base", "min_rep", "max_rep", "_sum_len", "_cached_cardinality")
@@ -713,9 +718,12 @@ class WordlistGenerator:
                 inner_vals_gen = _rep_gen(base_vals, cur.min_rep, cur.max_rep)
             for val in inner_vals_gen:
                 new_bindings = {**bindings, cur.name: val}
-                for suffix in self._combine_resume(
-                    nodes, idx + 1, start_from, new_bindings
-                ):
+                # Do not propagate start_from into binding suffixes: the binding
+                # value has already been consumed here but start_from still
+                # contains it, which confuses downstream nodes (especially
+                # BindRefNode). generate() uses a `found` flag to skip ahead,
+                # so passing None produces all values correctly.
+                for suffix in self._combine_resume(nodes, idx + 1, None, new_bindings):
                     yield val + suffix
             return
 
@@ -778,35 +786,91 @@ class WordlistGenerator:
             total *= nodes[i].cardinality
         return total
 
-    def _calculate_skipped_count(
-        self, nodes: list[Node | FileNode], target: str
-    ) -> int:
+    def _calculate_skipped_count(self, nodes: list, target: str) -> int:
         """calculates how many words exist strictly before 'target'."""
         skipped_count = 0
         current_target = target
+        bindings: dict[str, str] = {}
 
         for i, node in enumerate(nodes):
-            node_skipped, remainder = node.get_skipped_count(current_target)
-            suffix_capacity = self._get_suffix_capacity(nodes, i + 1)
-            skipped_count += node_skipped * suffix_capacity
-
-            if remainder is None:
-                break
-
-            current_target = remainder
-            if not current_target and i < len(nodes) - 1:
-                break
+            if isinstance(node, BindDefNode):
+                inner_idx = 0
+                found_val: str | None = None
+                for val in self._combine_resume(node.inner_nodes, 0, None, {}):
+                    if current_target.startswith(val):
+                        found_val = val
+                        break
+                    inner_idx += 1
+                if found_val is None:
+                    break
+                suffix_capacity = self._get_suffix_capacity(nodes, i + 1)
+                skipped_count += inner_idx * suffix_capacity
+                bindings[node.name] = found_val
+                current_target = current_target[len(found_val) :]
+                if not current_target and i < len(nodes) - 1:
+                    break
+            elif isinstance(node, BindRefNode):
+                if node.name not in bindings:
+                    raise ExprError(f"undefined variable '{node.name}'.")
+                val = bindings[node.name]
+                # ref adds combinations only when repetition varies
+                if node.min_rep != node.max_rep:
+                    ref_card = node.cardinality
+                    suffix_capacity = self._get_suffix_capacity(nodes, i + 1)
+                    for r in range(node.min_rep, node.max_rep + 1):
+                        out = val * r if r > 0 else ""
+                        if current_target.startswith(out):
+                            node_skipped = r - node.min_rep
+                            skipped_count += node_skipped * suffix_capacity
+                            current_target = current_target[len(out) :]
+                            break
+                else:
+                    out = val * node.min_rep if node.min_rep > 0 else ""
+                    if not current_target.startswith(out):
+                        break
+                    current_target = current_target[len(out) :]
+                if not current_target and i < len(nodes) - 1:
+                    break
+            else:
+                node_skipped, remainder = node.get_skipped_count(current_target)
+                suffix_capacity = self._get_suffix_capacity(nodes, i + 1)
+                skipped_count += node_skipped * suffix_capacity
+                if remainder is None:
+                    break
+                current_target = remainder
+                if not current_target and i < len(nodes) - 1:
+                    break
 
         return skipped_count
 
-    def get_word_at_index(self, nodes: list[Node | FileNode], index: int) -> str:
+    def get_word_at_index(self, nodes: list, index: int) -> str:
         """retrieves the word at a specific index."""
         result: list[str] = []
+        bindings: dict[str, str] = {}
         for i, node in enumerate(nodes):
             suffix_cap = self._get_suffix_capacity(nodes, i + 1)
-            node_idx = index // suffix_cap
-            index %= suffix_cap
-            result.append(node.get_item_at(node_idx))
+            if isinstance(node, BindDefNode):
+                inner_vals = list(self._combine_resume(node.inner_nodes, 0, None, {}))
+                node_idx = index // suffix_cap
+                index %= suffix_cap
+                val = inner_vals[node_idx]
+                bindings[node.name] = val
+                result.append(val)
+            elif isinstance(node, BindRefNode):
+                if node.name not in bindings:
+                    raise ExprError(f"undefined variable '{node.name}'.")
+                val_base = bindings[node.name]
+                if node.min_rep != node.max_rep:
+                    node_idx = index // suffix_cap
+                    index %= suffix_cap
+                    r = node.min_rep + node_idx
+                    result.append(val_base * r if r > 0 else "")
+                else:
+                    result.append(val_base * node.min_rep if node.min_rep > 0 else "")
+            else:
+                node_idx = index // suffix_cap
+                index %= suffix_cap
+                result.append(node.get_item_at(node_idx))
         return "".join(result)
 
     def stats(
