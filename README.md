@@ -99,7 +99,7 @@ $ fuse "/l{2,3}"
 | `/s`   | space                            |
 | `/o`   | octal digits (0–7)               |
 | `/p`   | special characters               |
-| `/N`   | newline (`\n`)                   |
+| `/b`   | newline (`\n`)                   |
 
 Example: `/l/l` generates all two-letter combinations (upper and lower case).
 

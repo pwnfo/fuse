@@ -32,7 +32,7 @@ Symbol    Meaning                  Example / Resulting Output
 ``/s``    Whitespace               `` `` (Space)
 ``/o``    Octal digits             ``0–7``
 ``/p``    Special characters       ``!@#$%^&*()-_+=``
-``/N``    Newline                  ``\n``
+``/b``    Newline                  ``\n``
 ========= ======================== =====================================
 
 Custom Classes and Unions
