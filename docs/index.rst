@@ -18,6 +18,7 @@ Fuse is a blazing fast and robust wordlist generator that parses character class
 
    features/expressions
    features/ranges_files
+   features/compression
    features/advanced
 
 .. toctree::
@@ -30,6 +31,6 @@ Why Fuse?
 ---------
 * **Compact Patterns**: Describe millions of words in just a few characters.
 * **Fast**: Employs mathematically optimal scaling algorithms yielding tens of thousands of words per second.
-* **Smart Seeking**: Instead of streaming from the beginning, Fuse can seek directly to a specific word using ``--from`` and ``--to``, keeping memory usage constant and small.
+* **Smart Seeking**: Instead of streaming from the beginning, Fuse can seek directly to a specific word using ``--start`` and ``--end``, keeping memory usage constant and small.
 * **Multi-threaded**: Distribute generation intelligently across up to 64 cores.
 * **Scriptable**: Robust ``.fuse`` syntax allows breaking rules into easily readable macros and modules.

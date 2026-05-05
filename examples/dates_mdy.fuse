@@ -4,13 +4,13 @@
 # ===============================
 # -- MM/DD/YYYY --
 
-%define 31d 0#[1-9]
+%define 31d 0/D
 %define 31d-2 #[10-31]
 
-%define 30d 0#[1-9]
+%define 30d 0/D
 %define 30d-2 #[10-30]
 
-%define fev 020#[1-9]
+%define fev 020/D
 %define fev-2 02#[10-29]
 
 %define 31dm [01|03|05|07|08|10|12]

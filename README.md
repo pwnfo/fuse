@@ -47,32 +47,30 @@ fuse "^:^" names.txt pass.txt
 Outputs can be manipulated, filtered, and saved.
 
 ```console
-$ fuse --help
-usage: fuse [options] <expression> [<files...>]
-
- ___  _ _  __  ___ 
-| __|| | |/ _|| __|
-| _| | U |\_ \| _| 
-|_|  |___||__/|___|
-                    v3.1.2
-
+General Options:
   -h, --help            show this help message and exit
   -v, --version         show version message and exit
   -o, --output <path>   write the wordlist in the file
-  -f, --file <path>     files with different expressions
+  -f, --file <path>     file with different expressions
   -q, --quiet           use quiet mode
-  -s, --separator <word>
-                        separator between entries
-  -b, --buffer <bytes>  buffer size in wordlist generation
-  -w, --workers <1-64>  number of workers (default is 1)
-  -F, --filter <regex>  filter generated words using a regex
   -n, --non-interactive
                         disable interactive prompt before execution
-  --from <word>         start writing the wordlist with <word>
-  --to <word>           ends writing the wordlist with <word>
 
-Powerful pattern-based wordlist generation tool.
-Developed by Ryan R. <pwnfo@proton.me>
+Generation Options:
+  -d, --delimiter <string>
+                        delimiter between entries
+  -b, --write-buffer <size>
+                        write buffer size
+  -w, --workers <1-64>  number of workers (default is 1)
+  -F, --filter <regex>  filter generated words using a regex
+  -k, --flush-threshold <size>
+                        byte threshold before flushing output (default is 512KB)
+  -z, --compress <format>
+                        compress output (available: gzip, bzip2 and lzma)
+  -l, --compresslevel <level>
+                        compression level (depends on selected format)
+  -S, --start <word>    start writing the wordlist from <word>
+  -E, --end <word>      end writing the wordlist at <word>
 ```
 
 ### Expression basics
@@ -144,6 +142,21 @@ $ fuse "^-^" names.txt years.txt
 ```
 
 Prefix a filename with `//` to treat it as an inline expression instead of a file path.
+
+### Compression
+
+Fuse supports on-the-fly compression when writing output files.
+
+```bash
+# gzip (fast, balanced)
+fuse "/l{5}" -z gzip -o wordlist.txt.gz
+
+# lzma (best compression)
+fuse "/l{5}" -z lzma -o wordlist.txt.xz
+
+# bzip2 (middle ground)
+fuse "/l{5}" -z bzip2 -o wordlist.txt.bz2
+```
 
 ### Escaping special characters
 
