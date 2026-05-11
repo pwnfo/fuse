@@ -70,16 +70,16 @@ def compressed_file_writer(
             else COMPRESSION_DEFAULT_LEVELS[compression]
         )
 
-        if compression == "gzip":
-            fp = gzip.open(output_path, "at", **c_kwargs)
-        elif compression == "bzip2":
-            fp = bz2.open(output_path, "at", **c_kwargs)
-        elif compression == "lzma":
-            fp = lzma.open(output_path, "at", **c_kwargs)
-        else:
-            log.error(f"unsupported compression format: '{compression}'.")
-            yield None
-            return
+        match compression:
+            case "gzip":
+                fp = gzip.open(output_path, "xt", **c_kwargs)
+            case "bzip2":
+                fp = bz2.open(output_path, "xt", **c_kwargs)
+            case "lzma":
+                fp = lzma.open(output_path, "xt", **c_kwargs)
+            case _:
+                log.error(f"unsupported compression format: '{compression}'.")
+                yield None
 
         yield fp
 

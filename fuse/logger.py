@@ -1,7 +1,29 @@
 import sys
 import logging
 
-from typing import Any
+from rich.console import Console
+from rich.logging import RichHandler
+from rich.text import Text
+from rich.markup import render
+
+class PlainRichHandler(RichHandler):
+    """Disable Rich text highlighting"""
+    def render_message(self, record: logging.LogRecord, message: str):
+        return render(message)
+
+    def get_level_text(self, record: logging.LogRecord) -> Text:
+        return Text(record.levelname)
+
+class FuseRichHandler(PlainRichHandler):
+    """Writes warnings and errors to `sys.stderr`"""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if record.levelno < logging.WARNING:
+            self.console = Console(file=sys.stdout)
+        else:
+            self.console = Console(file=sys.stderr)
+
+        super().emit(record)
 
 
 class FuseFormatter(logging.Formatter):
@@ -9,25 +31,25 @@ class FuseFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         if record.levelno == logging.WARNING:
-            return f"Warning: {record.getMessage()}"
+            return f"[bold yellow]\\[WARN][/bold yellow] {record.getMessage()}"
+        if record.levelno == logging.ERROR:
+            return f"[bold red]\\[ERROR][/bold red] {record.getMessage()}"
         return record.getMessage()
-
-
-class FuseStreamHandler(logging.StreamHandler):
-    """Writes warnings and errors to `sys.stderr`"""
-
-    def emit(self, record: logging.LogRecord) -> Any:
-        if record.levelno < logging.WARNING:
-            self.stream = sys.stdout
-        else:
-            self.stream = sys.stderr
-        super().emit(record)
-
 
 def setup_logger() -> logging.Logger:
     log = logging.getLogger(__name__)
 
-    handler = FuseStreamHandler(sys.stdout)
+    handler = FuseRichHandler(
+        markup=True,
+        rich_tracebacks=True,
+        show_time=False,
+        show_level=False,
+        show_path=False,
+        keywords=[]
+    )
+
+    handler.level_styles = {}
+
     handler.setFormatter(FuseFormatter())
 
     log.setLevel(logging.INFO)
@@ -37,4 +59,4 @@ def setup_logger() -> logging.Logger:
     return log
 
 
-log = setup_logger()  # main log
+log = setup_logger()

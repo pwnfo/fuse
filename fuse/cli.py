@@ -115,7 +115,7 @@ def generate(
                 event.set()
                 progress_proc.join()
 
-        log.info(datetime.now().strftime("Started at %H:%M:%S on %a, %b %d %Y."))
+        log.info(datetime.now().strftime("[bold]Started at %H:%M:%S on %a, %b %d %Y.[/]"))
 
         try:
             if options.threads > 1:
@@ -279,15 +279,16 @@ def generate(
                         item_l = len(item)
 
                         if pattern is not None and not re.match(pattern, token):
-                            progress.value += item_l
+                            # it does not increment `progress.value` to
+                            # increase performance.
+                            # progress.value += item_l
                             continue
 
                         buf.append(item)
                         buf_bytes += item_l
-                        progress.value += item_l
 
                         if buf_bytes >= flush_limit:
-                            fp.write("".join(buf))
+                            progress.value += fp.write("".join(buf))
                             buf.clear()
                             buf_bytes = 0
 
@@ -315,12 +316,12 @@ def generate(
         progress_proc.join()
 
     speed = int(total_words / elapsed) if elapsed > 0 else 0
-    log.info(f"Finished in {format_time(elapsed)} ({speed} W/s).")
+    log.info(f"[bold]Finished in [magenta]{format_time(elapsed)}[/magenta] ({speed} W/s).[/]")
 
     return 0
 
 
-def pause(prompt: str = "Press the Enter key to continue") -> bool:
+def pause(prompt: str = "\u203A Press the Enter key to continue") -> bool:
     """Pause execution and wait for user input in terminal."""
 
     # ignores if interactive prompt is not supported
@@ -373,49 +374,21 @@ def format_expression(expression: str, files: list[str]) -> tuple[str, list[str]
     return expression, files_out
 
 
-def print_info(args: Namespace, s_words: int, estimated_size: str) -> None:
+def print_info(s_words: int, estimated_size: str, compressor: None | str = None) -> None:
     """Displays generation statistics and information before execution."""
-    delimiter = args.delimiter.replace("\n", "\\n")
-    buffer = args.buffer if args.buffer != -1 else "<auto>"
-    pattern_files = ", ".join(args.files) if args.files else "<empty>"
-    output_file = args.output
-
-    if args.compress and args.output:
-        output_file = ensure_compression_extension(args.compress, args.output)
-        if output_file != args.output:
-            output_file += f" ({args.output})"
-
-    w_range = (args.start or "^") + " -> " + (args.end or "$")
-    compress = "<none>"
-    if args.compress:
-        compress = args.compress
-
-        if args.compresslevel is not None:
-            compresslevel = args.compresslevel
-        else:
-            compresslevel = COMPRESSION_DEFAULT_LEVELS[args.compress]
-        compress += f" [{compresslevel}]"
-
-    log.info(
-        " "
-        + "\n ".join(BANNER.split("\n"))  # adds a space before each line of `BANNER`
-        + "\n"
-        + (
-            f" :: {'Pattern':<13} : {args.expression}\n"
-            f" :: {'Pattern Files':<13} : {pattern_files}\n"
-            f" :: {'Workers':<13} : {args.workers}\n"
-            f" :: {'Output File':<13} : {output_file or '<stdout>'}\n"
-            f" :: {'Delimiter ':<13} : {delimiter or '<none>'}\n"
-            f" :: {'Filter':<13} : {args.filter or '<none>'}\n"
-            f" :: {'Compressor':<13} : {compress}\n"
-            f" :: {'Flush Limit':<13} : {args.flush}\n"
-            f" :: {'Buffering':<13} : {buffer}\n"
-            f" :: {'Words Range':<13} : {w_range}\n"
-            f" :: {'Words':<13} : {s_words}\n"
-            f" :: {'Size':<13} : {estimated_size}\n"
+    if compressor is None:
+        log.info(
+            BANNER
+            + f"\nFuse will generate [bold rgb(255,120,0)]{s_words:,} entries[/] "
+            f"({estimated_size})."
         )
-        + "\n"
-    )
+    else:
+        log.info(
+            BANNER
+            + f"\nFuse will generate [bold rgb(255,120,0)]{s_words:,} entries[/] "
+            f"({estimated_size} [underline]uncompressed[/], {compressor})."
+        )
+
 
 
 def main() -> int:
@@ -544,12 +517,9 @@ def main() -> int:
 
             return 1
 
-        estimated_size = format_size(s_bytes)
+        estimated_size = format_size(s_bytes, d=2)
 
-        if args.compress is not None:
-            estimated_size += " (plain)"
-
-        print_info(args, s_words, estimated_size)
+        print_info(s_words, estimated_size, compressor=args.compress)
     except (OverflowError, ValueError):
         log.error("Overflow Error! Is the expression correct?")
 

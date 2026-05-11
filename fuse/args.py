@@ -18,12 +18,11 @@ class FuseParser(argparse.ArgumentParser):
 
 def create_parser(prog: str = "fuse") -> FuseParser:
     """Create the main CLI argument parser"""
-    description = BANNER + "\n" + __description__
     parser = FuseParser(
         prog=prog,
         add_help=False,
         usage=f"{prog} [options] <expression> [<files...>]",
-        description=description,
+        description=__description__,
         epilog=__credits__
         + "\nMore information and examples:\n  https://fuse-generator.readthedocs.io/",
         formatter_class=argparse.RawDescriptionHelpFormatter,

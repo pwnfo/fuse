@@ -1,128 +1,102 @@
-import sys
-import time
+from __future__ import annotations
 
 from threading import Event
 from time import sleep
 from typing import Any
-from collections import deque
+
+from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    Progress,
+    ProgressColumn,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeRemainingColumn,
+)
+from rich.text import Text
+from rich.theme import Theme
 
 from fuse.core.formatters import format_size
 
 # -------------------------------------
 # progress bar configuration constants.
 # -------------------------------------
-_PROGRESS_EMA_ALPHA = 0.2  # exponential moving average smoothing factor.
-_PROGRESS_SAMPLE_HISTORY = 4  # number of time samples to keep.
-_PROGRESS_UPDATE_INTERVAL = 0.5  # seconds between progress updates.
-_PROGRESS_RATE_BLEND_THRESHOLD = 1.0  # seconds before using instant rate.
-_PROGRESS_RATE_BLEND_FACTOR = 0.5  # weight for blending rates.
+_PROGRESS_UPDATE_INTERVAL = 0.15
+
+_THEME = Theme(
+    {
+        "accent": "rgb(255,120,0)",
+        "accent_dim": "dim rgb(255,120,0)",
+        "accent2": "rgb(255,165,40)",
+    }
+)
 
 
-def calc_rate(samples: deque, total_bytes: int, elapsed: float) -> str:
-    """Calculate and format the current transfer rate"""
-    if elapsed > 0:
-        avg_rate = total_bytes / elapsed
-    else:
-        avg_rate = 0
+class FuseETAColumn(ProgressColumn):
+    """ETA in orange"""
 
-    if len(samples) < 2:
-        return format_size(avg_rate, d=2) + "/s" if avg_rate > 0 else "0 B/s"
+    def render(self, task) -> Text:
+        remaining = task.time_remaining
 
-    t0, b0 = samples[0]
-    t1, b1 = samples[-1]
+        if remaining is None:
+            return Text("--:--", style="accent2")
 
-    dt = t1 - t0
-    db = b1 - b0
+        mins, secs = divmod(int(remaining), 60)
+        return Text(f"{mins:02d}:{secs:02d}", style="accent_dim")
 
-    if dt <= 0 or db <= 0:
-        return format_size(avg_rate, d=2) + "/s" if avg_rate > 0 else "0 B/s"
+class SpeedColumn(ProgressColumn):
+    """Transfer speed column"""
 
-    inst_rate = db / dt
-
-    if dt < _PROGRESS_RATE_BLEND_THRESHOLD:
-        rate_val = (inst_rate * _PROGRESS_RATE_BLEND_FACTOR) + (
-            avg_rate * _PROGRESS_RATE_BLEND_FACTOR
-        )
-    else:
-        rate_val = inst_rate
-
-    return format_size(rate_val, d=2) + "/s"
+    def render(self, task) -> Text:
+        speed = task.speed or 0
+        return Text(f"{format_size(speed, d=2)}/s", style="accent2")
 
 
 def get_progress(e: Event, r: Any, total: int = 100) -> None:
-    """Display a progress bar in the terminal
+    """Display progress in the terminal."""
+    console = Console(theme=_THEME)
 
-    Args:
-        e (Event): Event to signal progress termination.
-        r (Any): Variable controlled by the writer to update the bytes written.
-        total (int, optional): Total number of bytes to be written (maximum value for `r.value`). Defaults to 100.
-    """
-    sys.stdout.write("\033[?25l")  # remove the terminal cursor
+    with Progress(
+        SpinnerColumn(style="accent_dim", spinner_name="dots"),
+        TextColumn("[accent2]{task.percentage:>3.0f}%[/]"),
+        TextColumn("[accent]{task.fields[done]} / {task.fields[total_fmt]}[/]"),
+        SpeedColumn(),
+        FuseETAColumn(),
+        console=console,
+        transient=True,
+        expand=False,
+        refresh_per_second=6,
+    ) as progress:
+        task_id = progress.add_task(
+            "",
+            total=total,
+            done=format_size(0, d=2),
+            total_fmt=format_size(total, d=2),
+        )
 
-    samples: deque = deque(maxlen=_PROGRESS_SAMPLE_HISTORY)
-    curr_bytes = 0
-    ema_rate = 0.0
-    start_time = time.time()
-
-    while r.value < total:
         try:
-            # stops the loop immediately if the event is set
-            if e.is_set():
-                break
+            while not e.is_set():
+                current = min(int(getattr(r, "value", 0)), total)
 
-            # freezes if `r.value` is not updated
-            if curr_bytes == r.value:
-                continue
+                progress.update(
+                    task_id,
+                    completed=current,
+                    done=format_size(current, d=2),
+                )
 
-            curr_time = time.time()
-            curr_bytes = r.value
+                if current >= total:
+                    break
 
-            samples.append((curr_time, curr_bytes))
-            elapsed_time = curr_time - start_time
-
-            inst_rate = 0.0
-            if len(samples) >= 2:
-                t0, b0 = samples[0]
-                t1, b1 = samples[-1]
-                dt = t1 - t0
-                db = b1 - b0
-
-                if dt > 0:
-                    inst_rate = db / dt
-
-            if inst_rate <= 0 and elapsed_time > 0:
-                inst_rate = curr_bytes / elapsed_time
-
-            ema_rate = (
-                (_PROGRESS_EMA_ALPHA * inst_rate) + (1 - _PROGRESS_EMA_ALPHA) * ema_rate
-                if ema_rate > 0
-                else inst_rate
-            )
-
-            rate = calc_rate(samples, curr_bytes, elapsed_time)
-
-            progress_pct = int((curr_bytes / total) * 100)
-
-            remaining_time = (total - curr_bytes) / ema_rate if ema_rate > 0 else 0
-            mins, secs = divmod(int(remaining_time), 60)
-
-            message = (
-                f"Generating {format_size(curr_bytes, d=2)} / {format_size(total, d=2)} "
-                f"[{progress_pct}%] @ {rate} ETA {mins:02d}:{secs:02d}"
-            )
-
-            # clears the terminal line
-            # before updating progress
-            sys.stdout.write("\033[2K\r")
-            sys.stdout.write(message)
-            sys.stdout.flush()
-
-            sleep(_PROGRESS_UPDATE_INTERVAL)
+                sleep(_PROGRESS_UPDATE_INTERVAL)
 
         except KeyboardInterrupt:
-            break
+            e.set()
 
-    # clears the line and redisplays
-    # the terminal cursor before exiting.
-    sys.stdout.write("\033[?25h\033[2K\r")
-    sys.stdout.flush()
+        finally:
+            final_value = min(int(getattr(r, "value", 0)), total)
+            progress.update(
+                task_id,
+                completed=final_value,
+                done=format_size(final_value, d=2),
+            )

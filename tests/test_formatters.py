@@ -5,38 +5,38 @@ from fuse.core.formatters import format_size, parse_size, format_time
 
 class TestFormatSize:
     def test_bytes(self):
-        assert format_size(500) == "500B"
+        assert format_size(500) == "500 B"
 
     def test_kilobytes(self):
-        assert format_size(1024) == "1KB"
+        assert format_size(1024) == "1 KB"
 
     def test_megabytes(self):
-        assert format_size(1024**2) == "1MB"
+        assert format_size(1024**2) == "1 MB"
 
     def test_gigabytes(self):
-        assert format_size(1024**3) == "1GB"
+        assert format_size(1024**3) == "1 GB"
 
     def test_terabytes(self):
-        assert format_size(1024**4) == "1TB"
+        assert format_size(1024**4) == "1 TB"
 
     def test_petabytes(self):
-        assert format_size(1024**5) == "1PB"
+        assert format_size(1024**5) == "1 PB"
 
     def test_exabytes(self):
-        assert format_size(1024**6) == "1EB"
+        assert format_size(1024**6) == "1 EB"
 
     def test_zero(self):
-        assert format_size(0) == "0B"
+        assert format_size(0) == "0 B"
 
     def test_decimal_precision(self):
         result = format_size(1536, d=2)
-        assert result == "1.50KB"
+        assert result == "1.50 KB"
 
     def test_fractional_bytes(self):
-        assert format_size(512) == "512B"
+        assert format_size(512) == "512 B"
 
     def test_just_under_kb(self):
-        assert format_size(1023) == "1023B"
+        assert format_size(1023) == "1023 B"
 
 
 # ─── parse_size ──────────────────────────────────────────────────────────────

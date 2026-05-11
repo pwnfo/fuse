@@ -6,10 +6,10 @@ def format_size(b: int | float, d: int = 0) -> str:
 
     for unit in ["B", "KB", "MB", "GB", "TB", "PB"]:
         if b < 1024:
-            return f"{b:.{d}f}{unit}"
+            return f"{b:.{d}f} {unit}"
         b /= 1024
 
-    return f"{b:.{d}f}EB"
+    return f"{b:.{d}f} EB"
 
 
 def parse_size(size: str) -> int:

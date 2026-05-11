@@ -63,7 +63,7 @@ class TestCompressedFileWriter:
         with lzma.open(expected_path, "rt", encoding="utf-8") as f:
             assert f.read() == content
 
-    def test_gzip_append(self, tmp_path):
+    def test_gzip_file_exists(self, tmp_path):
         filepath = str(tmp_path / "test.txt")
 
         with fuse_open(filepath, "a", encoding="utf-8", compression="gzip") as fp:
@@ -71,14 +71,7 @@ class TestCompressedFileWriter:
             fp.write("first\n")
 
         with fuse_open(filepath, "a", encoding="utf-8", compression="gzip") as fp:
-            assert fp is not None
-            fp.write("second\n")
-
-        expected_path = filepath + ".gz"
-        with gzip.open(expected_path, "rt", encoding="utf-8") as f:
-            content = f.read()
-            assert "first\n" in content
-            assert "second\n" in content
+            assert fp is None
 
     def test_no_compression(self, tmp_path):
         filepath = str(tmp_path / "test.txt")

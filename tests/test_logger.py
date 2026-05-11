@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-from fuse.logger import log, FuseStreamHandler
+from fuse.logger import log, FuseRichHandler
 
 
 class TestLogger:
@@ -12,7 +12,7 @@ class TestLogger:
         assert log.level == logging.INFO
 
     def test_has_fuse_handler(self):
-        handlers = [h for h in log.handlers if isinstance(h, FuseStreamHandler)]
+        handlers = [h for h in log.handlers if isinstance(h, FuseRichHandler)]
         assert len(handlers) >= 1
 
     def test_propagate_disabled(self):
