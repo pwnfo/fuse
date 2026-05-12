@@ -27,7 +27,7 @@ class ExprError(Exception):
                 snippet = Text()
 
                 if start > 0:
-                    snippet.append("...")
+                    snippet.append("...", style="magenta dim")
 
                 for i, ch in enumerate(pattern[start:end]):
                     if start + i == char_pos:
@@ -36,7 +36,7 @@ class ExprError(Exception):
                         snippet.append(ch)
 
                 if end < len(pattern):
-                    snippet.append("...")
+                    snippet.append("...", style="magenta dim")
 
                 caret_pos = (char_pos - start) + (3 if start > 0 else 0)
             else:
@@ -45,8 +45,6 @@ class ExprError(Exception):
 
             rich_buffer = StringIO()
             console = Console(file=rich_buffer, highlight=True, force_terminal=True)
-
-            snippet.highlight_words("...", "purple dim")
 
             console.print(snippet)
             console.print(" " * max(0, caret_pos - 1) + "[bold blue]^^^[/]", end="")
