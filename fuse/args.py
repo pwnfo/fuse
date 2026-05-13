@@ -14,6 +14,8 @@ Examples:
   fuse '/h{6}' -F '.{4}ff' -w 3 -n
   fuse '/H{6}' -z gzip -k 1MB -l 7 -o hashes.txt.gz
 """
+
+
 class FuseParser(argparse.ArgumentParser):
     """Format `argparse.ArgumentParser` error message"""
 
@@ -25,7 +27,12 @@ class FuseParser(argparse.ArgumentParser):
 
 def create_parser(prog: str = "fuse") -> FuseParser:
     """Create the main CLI argument parser"""
-    epilog = CLI_EXAMPLES + "\n" + __credits__ + "\nMore information and examples:\n  https://fuse-generator.readthedocs.io/"
+    epilog = (
+        CLI_EXAMPLES
+        + "\n"
+        + __credits__
+        + "\nMore information and examples:\n  https://fuse-generator.readthedocs.io/"
+    )
     parser = FuseParser(
         prog=prog,
         add_help=False,
@@ -52,7 +59,11 @@ def create_parser(prog: str = "fuse") -> FuseParser:
         help="show version information and exit",
     )
     general_group.add_argument(
-        "-q", "--quiet", action="store_true", dest="quiet", help="suppress non-essential output"
+        "-q",
+        "--quiet",
+        action="store_true",
+        dest="quiet",
+        help="suppress non-essential output",
     )
     general_group.add_argument(
         "-n",
@@ -83,7 +94,6 @@ def create_parser(prog: str = "fuse") -> FuseParser:
         dest="end",
         help="stop writing output at <word>",
     )
-
 
     generation_group.add_argument(
         "-d",
@@ -149,8 +159,7 @@ def create_parser(prog: str = "fuse") -> FuseParser:
         dest="compresslevel",
         help=" compression level for the selected format",
     )
-    
-    
+
     # positional arguments
     parser.add_argument("expression", nargs="?", help=argparse.SUPPRESS)
     parser.add_argument("files", nargs="*", help=argparse.SUPPRESS)

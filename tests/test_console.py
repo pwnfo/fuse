@@ -78,12 +78,12 @@ class TestGetProgress:
     def test_get_progress_updates(self, mock_sleep):
         e = Event()
         r = DummyValue(0)
-        
+
         def update_value(*args, **kwargs):
             r.value += 50
-        
+
         mock_sleep.side_effect = update_value
-        
+
         get_progress(e, r, total=100)
         assert mock_sleep.call_count > 0
 

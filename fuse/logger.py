@@ -6,13 +6,16 @@ from rich.logging import RichHandler
 from rich.text import Text
 from rich.markup import render
 
+
 class PlainRichHandler(RichHandler):
     """Disable Rich text highlighting"""
-    def render_message(self, record: logging.LogRecord, message: str):
+
+    def render_message(self, record: logging.LogRecord, message: str) -> Text:
         return render(message)
 
     def get_level_text(self, record: logging.LogRecord) -> Text:
         return Text(record.levelname)
+
 
 class FuseRichHandler(PlainRichHandler):
     """Writes warnings and errors to `sys.stderr`"""
@@ -36,6 +39,7 @@ class FuseFormatter(logging.Formatter):
             return f"[bold red]\\[ERROR][/bold red] {record.getMessage()}"
         return record.getMessage()
 
+
 def setup_logger() -> logging.Logger:
     log = logging.getLogger(__name__)
 
@@ -45,7 +49,7 @@ def setup_logger() -> logging.Logger:
         show_time=False,
         show_level=False,
         show_path=False,
-        keywords=[]
+        keywords=[],
     )
 
     handler.level_styles = {}

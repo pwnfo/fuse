@@ -36,7 +36,7 @@ _THEME = Theme(
 class FuseETAColumn(ProgressColumn):
     """ETA in orange"""
 
-    def render(self, task) -> Text:
+    def render(self, task: Any) -> Text:
         remaining = task.time_remaining
 
         if remaining is None:
@@ -45,10 +45,11 @@ class FuseETAColumn(ProgressColumn):
         mins, secs = divmod(int(remaining), 60)
         return Text(f"{mins:02d}:{secs:02d}", style="accent_dim")
 
+
 class SpeedColumn(ProgressColumn):
     """Transfer speed column"""
 
-    def render(self, task) -> Text:
+    def render(self, task: Any) -> Text:
         speed = task.speed or 0
         return Text(f"{format_size(speed, d=2)}/s", style="accent2")
 

@@ -115,7 +115,9 @@ def generate(
                 event.set()
                 progress_proc.join()
 
-        log.info(datetime.now().strftime("[bold]Started at %H:%M:%S on %a, %b %d %Y.[/]"))
+        log.info(
+            datetime.now().strftime("[bold]Started at %H:%M:%S on %a, %b %d %Y.[/]")
+        )
 
         try:
             if options.threads > 1:
@@ -316,12 +318,14 @@ def generate(
         progress_proc.join()
 
     speed = int(total_words / elapsed) if elapsed > 0 else 0
-    log.info(f"[bold]Finished in [magenta]{format_time(elapsed)}[/magenta] ({speed} W/s).[/]")
+    log.info(
+        f"[bold]Finished in [magenta]{format_time(elapsed)}[/magenta] ({speed} W/s).[/]"
+    )
 
     return 0
 
 
-def pause(prompt: str = "\u203A Press the Enter key to continue") -> bool:
+def pause(prompt: str = "\u203a Press the Enter key to continue") -> bool:
     """Pause execution and wait for user input in terminal."""
 
     # ignores if interactive prompt is not supported
@@ -374,7 +378,9 @@ def format_expression(expression: str, files: list[str]) -> tuple[str, list[str]
     return expression, files_out
 
 
-def print_info(s_words: int, estimated_size: str, compressor: None | str = None) -> None:
+def print_info(
+    s_words: int, estimated_size: str, compressor: None | str = None
+) -> None:
     """Displays generation statistics and information before execution."""
     if compressor is None:
         log.info(
@@ -388,7 +394,6 @@ def print_info(s_words: int, estimated_size: str, compressor: None | str = None)
             + f"\nFuse will generate [bold rgb(255,120,0)]{s_words:,} entries[/] "
             f"({estimated_size} [underline]uncompressed[/], {compressor})."
         )
-
 
 
 def main() -> int:
