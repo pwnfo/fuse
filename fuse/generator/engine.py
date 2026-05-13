@@ -6,6 +6,7 @@ from fuse.utils.classes import pattern_repl
 from fuse.generator.exceptions import ExprError
 from fuse.generator.nodes import Node, FileNode, BindDefNode, BindRefNode
 
+
 class FuseGenerator:
     BRACES_RE = re.compile(r"\{(\d+)(?:\s*,\s*(\d+))?\}")
     RANGE_RE = re.compile(r"\s*([0-9]+)\s*-\s*([0-9]+)\s*(?::\s*([+-]?\d+)\s*)?$")
@@ -62,12 +63,17 @@ class FuseGenerator:
 
     def _parse_range(self, pattern: str, start_idx: int) -> tuple[list[str], int]:
         end_pos = self._find_closing(pattern, start_idx, "]")
-        if end_pos == -1:   
-            raise ExprError("unclosed range (missing ']')", error_pos=(pattern, start_idx))
+        if end_pos == -1:
+            raise ExprError(
+                "unclosed range (missing ']')", error_pos=(pattern, start_idx)
+            )
         inner = pattern[start_idx:end_pos]
         m = self.RANGE_RE.match(inner)
         if not m:
-            raise ExprError("invalid range syntax (expected '#[START-END[:STEP]]')", error_pos=(pattern, start_idx))
+            raise ExprError(
+                "invalid range syntax (expected '#[START-END[:STEP]]')",
+                error_pos=(pattern, start_idx),
+            )
         r_start = int(m.group(1))
         r_end = int(m.group(2))
         step_str = m.group(3)
@@ -75,7 +81,9 @@ class FuseGenerator:
         if step == 0:
             raise ExprError("range step cannot be zero", error_pos=(pattern, start_idx))
         if r_start < 0 or r_end < 0:
-            raise ExprError("range bounds must be non-negative", error_pos=(pattern, start_idx))
+            raise ExprError(
+                "range bounds must be non-negative", error_pos=(pattern, start_idx)
+            )
         if (step > 0 and r_start > r_end) or (step < 0 and r_start < r_end):
             raise ExprError("invalid range sequence", error_pos=(pattern, start_idx))
         if step > 0:
@@ -93,10 +101,15 @@ class FuseGenerator:
         closer = ")" if literal_mode else "]"
         end_pos = self._find_closing(pattern, start_idx, closer)
         if end_pos == -1:
-            raise ExprError(f"unclosed character class (missing {closer!r})", error_pos=(pattern, start_idx))
+            raise ExprError(
+                f"unclosed character class (missing {closer!r})",
+                error_pos=(pattern, start_idx),
+            )
         inner = pattern[start_idx:end_pos]
         if not inner:
-            raise ExprError("empty character class is not allowed", error_pos=(pattern, start_idx))
+            raise ExprError(
+                "empty character class is not allowed", error_pos=(pattern, start_idx)
+            )
         if literal_mode:
             return [inner], end_pos + 1
         if "|" not in inner and "\\" not in inner:
@@ -118,7 +131,9 @@ class FuseGenerator:
         segments.append("".join(buf))
         choices = [s.strip() for s in segments if s.strip()]
         if not choices:
-            raise ExprError("invalid character class contents", error_pos=(pattern, start_idx))
+            raise ExprError(
+                "invalid character class contents", error_pos=(pattern, start_idx)
+            )
         return choices, end_pos + 1
 
     def _tokenize_raw(self, pattern: str) -> list[tuple[str, Any]]:
@@ -132,7 +147,10 @@ class FuseGenerator:
             c = pr[i]
             if c == "\\":
                 if i + 1 >= n:
-                    raise ExprError("invalid escape sequence (trailing backslash)", error_pos=(pattern, i+1))
+                    raise ExprError(
+                        "invalid escape sequence (trailing backslash)",
+                        error_pos=(pattern, i + 1),
+                    )
                 tokens.append(("LIT", pr[i + 1]))
                 i += 2
                 continue
@@ -140,19 +158,27 @@ class FuseGenerator:
                 if i + 1 < n and pr[i + 1] == "@":
                     end = self._find_binding_close(pr, i + 2)
                     if end == -1:
-                        raise ExprError("unclosed binding (missing '>')", error_pos=(pattern, i+1))
+                        raise ExprError(
+                            "unclosed binding (missing '>')", error_pos=(pattern, i + 1)
+                        )
                     inner = pr[i + 2 : end]
                     eq_pos = inner.find("=")
                     if eq_pos == -1:
                         name = inner.strip()
                         if not name.isidentifier():
-                            raise ExprError(f"invalid binding name {name!r}", error_pos=(pattern, i+1))
+                            raise ExprError(
+                                f"invalid binding name {name!r}",
+                                error_pos=(pattern, i + 1),
+                            )
                         tokens.append(("BIND_REF", name))
                     else:
                         name = inner[:eq_pos].strip()
                         expr = inner[eq_pos + 1 :]
                         if not name.isidentifier():
-                            raise ExprError(f"invalid binding name {name!r}", error_pos=(pattern, i+1))
+                            raise ExprError(
+                                f"invalid binding name {name!r}",
+                                error_pos=(pattern, i + 1),
+                            )
                         inner_tokens = self._tokenize_raw(expr)
                         tokens.append(("BIND_DEF", (name, inner_tokens)))
                     i = end + 1
@@ -193,12 +219,17 @@ class FuseGenerator:
                     a = int(m.group(1))
                     b = int(m.group(2)) if m.group(2) is not None else a
                     if a > b:
-                        raise ExprError("invalid repetition range (min > max)", error_pos=(pattern, i+1))
+                        raise ExprError(
+                            "invalid repetition range (min > max)",
+                            error_pos=(pattern, i + 1),
+                        )
                     tokens.append(("BRACES", (a, b)))
                     i += m.end()
                     continue
                 else:
-                    raise ExprError("invalid repetition syntax", error_pos=(pattern, i+1))
+                    raise ExprError(
+                        "invalid repetition syntax", error_pos=(pattern, i + 1)
+                    )
             tokens.append(("LIT", c))
             i += 1
         return tokens
@@ -363,7 +394,7 @@ class FuseGenerator:
 
         for item in iterator:
             if not found:
-                if item >= start_from:
+                if start_from is not None and item >= start_from:
                     found = True
                 else:
                     continue
@@ -380,61 +411,113 @@ class FuseGenerator:
             total *= nodes[i].cardinality
         return total
 
-    def _calculate_skipped_count(self, nodes: list, target: str) -> int:
-        """calculates how many words exist strictly before 'target'."""
+    def _calculate_skipped_stats(self, nodes: list, target: str) -> tuple[int, int]:
+        """calculates how many (words, bytes) exist strictly before 'target'."""
         skipped_count = 0
+        skipped_bytes = 0
         current_target = target
+        current_prefix_len = 0
         bindings: dict[str, str] = {}
+        local_binding_stats: dict[str, tuple[int, int]] = {}
 
         for i, node in enumerate(nodes):
             if isinstance(node, BindDefNode):
+                inner_bytes, inner_count = self.stats(
+                    node.inner_nodes, delimiter_len=0, binding_stats=local_binding_stats
+                )
+                avg_len = inner_bytes // inner_count if inner_count > 0 else 0
+                local_binding_stats[node.name] = (inner_count, avg_len)
+
+            suffix_bytes, suffix_count = self.stats(
+                nodes[i + 1 :], delimiter_len=0, binding_stats=local_binding_stats
+            )
+
+            if isinstance(node, BindDefNode):
                 inner_idx = 0
+                inner_bytes_skipped = 0
                 found_val: str | None = None
-                for val in self._combine_resume(node.inner_nodes, 0, None, {}):
+
+                for val in self._combine_resume(node.inner_nodes, 0, None, bindings):
+                    val_b = len(val.encode("utf-8"))
                     if current_target.startswith(val):
                         found_val = val
                         break
                     inner_idx += 1
+                    inner_bytes_skipped += val_b
+
                 if found_val is None:
-                    break
-                suffix_capacity = self._get_suffix_capacity(nodes, i + 1)
-                skipped_count += inner_idx * suffix_capacity
+                    raise ExprError(
+                        f"word {target!r} is not reachable by this expression"
+                    )
+
+                skipped_count += inner_idx * suffix_count
+                skipped_bytes += (
+                    (inner_bytes_skipped * suffix_count)
+                    + (inner_idx * suffix_bytes)
+                    + (inner_idx * suffix_count * current_prefix_len)
+                )
+
                 bindings[node.name] = found_val
-                current_target = current_target[len(found_val) :]
-                if not current_target and i < len(nodes) - 1:
-                    break
+                val_b = len(found_val.encode("utf-8"))
+                current_prefix_len += val_b
+                current_target = current_target[val_b:]
+
             elif isinstance(node, BindRefNode):
                 if node.name not in bindings:
                     raise ExprError(f"undefined variable {node.name!r}")
                 val = bindings[node.name]
+                val_b = len(val.encode("utf-8"))
+
                 if node.min_rep != node.max_rep:
-                    ref_card = node.cardinality
-                    suffix_capacity = self._get_suffix_capacity(nodes, i + 1)
+                    found_r = None
                     for r in range(node.min_rep, node.max_rep + 1):
                         out = val * r if r > 0 else ""
+                        out_b = len(out.encode("utf-8"))
                         if current_target.startswith(out):
-                            node_skipped = r - node.min_rep
-                            skipped_count += node_skipped * suffix_capacity
-                            current_target = current_target[len(out) :]
+                            found_r = r
                             break
+                        skipped_count += suffix_count
+                        skipped_bytes += suffix_bytes + (
+                            suffix_count * (current_prefix_len + out_b)
+                        )
+
+                    if found_r is None:
+                        raise ExprError(
+                            f"word {target!r} is not reachable by this expression"
+                        )
+
+                    current_prefix_len += len((val * found_r).encode("utf-8"))
+                    current_target = current_target[len(val * found_r) :]
                 else:
                     out = val * node.min_rep if node.min_rep > 0 else ""
                     if not current_target.startswith(out):
-                        break
+                        raise ExprError(
+                            f"word {target!r} is not reachable by this expression"
+                        )
+                    current_prefix_len += len(out.encode("utf-8"))
                     current_target = current_target[len(out) :]
-                if not current_target and i < len(nodes) - 1:
-                    break
-            else:
-                node_skipped, remainder = node.get_skipped_count(current_target)
-                suffix_capacity = self._get_suffix_capacity(nodes, i + 1)
-                skipped_count += node_skipped * suffix_capacity
-                if remainder is None:
-                    break
-                current_target = remainder
-                if not current_target and i < len(nodes) - 1:
-                    break
 
-        return skipped_count
+            else:
+                n_count, n_bytes, remainder = node.get_skipped_stats(
+                    current_target, current_prefix_len
+                )
+
+                skipped_count += n_count * suffix_count
+                skipped_bytes += (n_bytes * suffix_count) + (n_count * suffix_bytes)
+
+                if remainder is None:
+                    raise ExprError(
+                        f"word {target!r} is not reachable by this expression"
+                    )
+
+                consumed = current_target[: len(current_target) - len(remainder)]
+                current_prefix_len += len(consumed.encode("utf-8"))
+                current_target = remainder
+
+        if current_target != "":
+            raise ExprError(f"word {target!r} is not reachable by this expression")
+
+        return skipped_count, skipped_bytes
 
     def get_word_at_index(self, nodes: list, index: int) -> str:
         """retrieves the word at a specific index."""
@@ -472,11 +555,16 @@ class FuseGenerator:
         delimiter_len: int = 1,
         start_from: str | None = None,
         end: str | None = None,
+        binding_stats: dict[str, tuple[int, int]] | None = None,
     ) -> tuple[int, int]:
         """calculates wordlist stats, adjusted for start_from and end range."""
         total_count = 1
         total_bytes = 0
-        binding_stats: dict[str, tuple[int, int]] = {}
+        if binding_stats is None:
+            binding_stats = {}
+        else:
+            # copy to avoid modifying parent context
+            binding_stats = dict(binding_stats)
 
         for node in nodes:
             if isinstance(node, BindDefNode):
@@ -541,24 +629,27 @@ class FuseGenerator:
         if not start_from and not end:
             return full_total_bytes, full_total_count
 
-        start_deduction = 0
+        start_count = 0
+        start_bytes = 0
         if start_from:
-            start_idx = self._calculate_skipped_count(nodes, start_from)
-            start_deduction = start_idx
+            start_count, start_bytes = self._calculate_skipped_stats(nodes, start_from)
+            start_bytes += start_count * delimiter_len
 
-        end_cap = full_total_count
+        end_count = full_total_count
+        end_bytes = full_total_bytes
         if end:
-            end_idx = self._calculate_skipped_count(nodes, end)
-            end_cap = end_idx + 1
+            sk_count, sk_bytes = self._calculate_skipped_stats(nodes, end)
+            end_count = sk_count + 1
+            end_word_size = len(end.encode("utf-8"))
+            end_bytes = (
+                sk_bytes + (sk_count * delimiter_len) + end_word_size + delimiter_len
+            )
 
-        actual_count = end_cap - start_deduction
+        actual_count = end_count - start_count
+        actual_bytes = end_bytes - start_bytes
+
         if actual_count < 0:
             actual_count = 0
-
-        if full_total_count > 0:
-            ratio = actual_count / full_total_count
-            actual_bytes = int(full_total_bytes * ratio)
-        else:
             actual_bytes = 0
 
-        return actual_bytes, actual_count
+        return int(actual_bytes), int(actual_count)

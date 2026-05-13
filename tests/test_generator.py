@@ -480,17 +480,20 @@ class TestCalculateSkippedCount:
     def test_first_word_skips_zero(self):
         tokens = self.gen.tokenize("[ab][12]")
         nodes = self.gen.parse(tokens)
-        assert self.gen._calculate_skipped_count(nodes, "a1") == 0
+        count, _ = self.gen._calculate_skipped_stats(nodes, "a1")
+        assert count == 0
 
     def test_second_word_skips_one(self):
         tokens = self.gen.tokenize("[ab][12]")
         nodes = self.gen.parse(tokens)
-        assert self.gen._calculate_skipped_count(nodes, "a2") == 1
+        count, _ = self.gen._calculate_skipped_stats(nodes, "a2")
+        assert count == 1
 
     def test_last_word(self):
         tokens = self.gen.tokenize("[ab][12]")
         nodes = self.gen.parse(tokens)
-        assert self.gen._calculate_skipped_count(nodes, "b2") == 3
+        count, _ = self.gen._calculate_skipped_stats(nodes, "b2")
+        assert count == 3
 
 
 class TestBinding:

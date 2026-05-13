@@ -219,7 +219,9 @@ def generate(
 
                 start_idx = 0
                 if start_token is not None:
-                    start_idx = generator._calculate_skipped_count(nodes, start_token)
+                    start_idx, _ = generator._calculate_skipped_stats(
+                        nodes, start_token
+                    )
 
                 # ---------------------------------------------------------------------------
                 # calculates the word generation portion for each worker and initializes them

@@ -52,8 +52,6 @@ def setup_logger() -> logging.Logger:
         keywords=[],
     )
 
-    handler.level_styles = {}
-
     handler.setFormatter(FuseFormatter())
 
     log.setLevel(logging.INFO)

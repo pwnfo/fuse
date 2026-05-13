@@ -3,6 +3,7 @@ from typing import Generator
 from fuse.utils.files import fuse_open
 from fuse.generator.exceptions import ExprError
 
+
 class BindDefNode:
     """Represents <@name=expr>: generates values from inner_nodes and stores each under name."""
 
@@ -174,57 +175,89 @@ class Node:
                     pool, depth - 1, target, candidate, seeking=False
                 )
 
-    def get_skipped_count(self, target: str) -> tuple[int, str | None]:
-        """calculates how many items this node skips to reach a prefix of 'target'."""
-        skipped_total = 0
+    def get_skipped_stats(
+        self, target: str, current_prefix_len: int = 0
+    ) -> tuple[int, int, str | None]:
+        """calculates (count, bytes, remainder) strictly before 'target'."""
+        skipped_count = 0
+        skipped_bytes = 0
         base_len = len(self.base)
+
+        if self._sum_len is None:
+            self._sum_len = sum(len(str(x).encode("utf-8")) for x in self.base)
+
+        sum_len = self._sum_len
 
         for k in range(self.min_rep, self.max_rep + 1):
             if k == 0:
                 if target:
-                    skipped_total += 1
+                    skipped_count += 1
                     continue
                 else:
-                    return skipped_total, ""
+                    return skipped_count, skipped_bytes, ""
 
-            res_skipped, res_remainder = self._calc_skip_recursive(self.base, k, target)
+            res_count, res_bytes, res_remainder = self._calc_skip_recursive_stats(
+                self.base, k, target, current_prefix_len
+            )
 
             if res_remainder is not None:
-                return skipped_total + res_skipped, res_remainder
-
-            skipped_total += base_len**k
-
-        return skipped_total, None
-
-    def _calc_skip_recursive(
-        self, pool: list[str], depth: int, target: str
-    ) -> tuple[int, str | None]:
-        """recursive helper to calculate skip count (ranking logic)."""
-        if depth == 0:
-            return 0, target
-
-        skipped = 0
-        pool_len = len(pool)
-
-        for i, item in enumerate(pool):
-            if target.startswith(item):
-                rem_target = target[len(item) :]
-                rec_skipped, rec_remainder = self._calc_skip_recursive(
-                    pool, depth - 1, rem_target
+                return (
+                    skipped_count + res_count,
+                    skipped_bytes + res_bytes,
+                    res_remainder,
                 )
 
-                if rec_remainder is not None:
-                    return skipped + rec_skipped, rec_remainder
+            skipped_count += base_len**k
+            level_bytes = (k * (base_len ** (k - 1)) * sum_len) + (
+                (base_len**k) * current_prefix_len
+            )
+            skipped_bytes += level_bytes
+
+        return skipped_count, skipped_bytes, None
+
+    def _calc_skip_recursive_stats(
+        self, pool: list[str], depth: int, target: str, prefix_len: int
+    ) -> tuple[int, int, str | None]:
+        """recursive helper for skipped stats (count, bytes, remainder)."""
+        if depth == 0:
+            return 0, 0, target
+
+        skipped_c = 0
+        skipped_b = 0
+        pool_len = len(pool)
+
+        if self._sum_len is None:
+            self._sum_len = sum(len(str(x).encode("utf-8")) for x in pool)
+        sum_len = self._sum_len
+
+        for item in pool:
+            item_b = len(item.encode("utf-8"))
+            if target.startswith(item):
+                rem_target = target[len(item) :]
+                rec_c, rec_b, rec_rem = self._calc_skip_recursive_stats(
+                    pool, depth - 1, rem_target, prefix_len + item_b
+                )
+
+                if rec_rem is not None:
+                    return skipped_c + rec_c, skipped_b + rec_b, rec_rem
                 else:
-                    skipped += pool_len ** (depth - 1)
+                    skipped_c += pool_len ** (depth - 1)
+                    branch_b = (
+                        (depth - 1) * (pool_len ** (max(0, depth - 2))) * sum_len
+                    ) + ((pool_len ** (depth - 1)) * (prefix_len + item_b))
+                    skipped_b += branch_b
 
             elif item.startswith(target):
-                return skipped, ""
+                return skipped_c, skipped_b, ""
 
             else:
-                skipped += pool_len ** (depth - 1)
+                skipped_c += pool_len ** (depth - 1)
+                branch_b = (
+                    (depth - 1) * (pool_len ** (max(0, depth - 2))) * sum_len
+                ) + ((pool_len ** (depth - 1)) * (prefix_len + item_b))
+                skipped_b += branch_b
 
-        return skipped, None
+        return skipped_c, skipped_b, None
 
     def get_item_at(self, index: int) -> str:
         """retrieves the item at a specific index."""
@@ -348,27 +381,42 @@ class FileNode(Node):
         self._cached_sum_len = total_len
         return len(data), total_len
 
-    def get_skipped_count(self, target: str) -> tuple[int, str | None]:
-        """calculates skipped count using file lines as base."""
-        skipped_total = 0
+    def get_skipped_stats(
+        self, target: str, current_prefix_len: int = 0
+    ) -> tuple[int, int, str | None]:
+        """calculates skipped count and bytes using file lines as base."""
+        skipped_count = 0
+        skipped_bytes = 0
         choices = self.lines
         base_len = len(choices)
+
+        count_info, sum_len = self.stats_info()
 
         for k in range(self.min_rep, self.max_rep + 1):
             if k == 0:
                 if target:
-                    skipped_total += 1
+                    skipped_count += 1
                     continue
                 else:
-                    return skipped_total, ""
+                    return skipped_count, skipped_bytes, ""
 
-            res_skipped, res_remainder = self._calc_skip_recursive(choices, k, target)
+            res_count, res_bytes, res_remainder = self._calc_skip_recursive_stats(
+                choices, k, target, current_prefix_len
+            )
             if res_remainder is not None:
-                return skipped_total + res_skipped, res_remainder
+                return (
+                    skipped_count + res_count,
+                    skipped_bytes + res_bytes,
+                    res_remainder,
+                )
 
-            skipped_total += base_len**k
+            skipped_count += base_len**k
+            level_bytes = (k * (base_len ** (k - 1)) * sum_len) + (
+                (base_len**k) * current_prefix_len
+            )
+            skipped_bytes += level_bytes
 
-        return skipped_total, None
+        return skipped_count, skipped_bytes, None
 
     def get_item_at(self, index: int) -> str:
         """retrieves the item at a specific index."""

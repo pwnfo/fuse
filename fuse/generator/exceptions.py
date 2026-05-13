@@ -2,6 +2,7 @@ from rich.console import Console
 from rich.text import Text
 from io import StringIO
 
+
 class ExprError(Exception):
     def __init__(self, message: str, error_pos: tuple[str, int] | None = None) -> None:
         if error_pos is not None:
