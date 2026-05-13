@@ -44,6 +44,9 @@ fuse "^:^" names.txt pass.txt
 Outputs can be manipulated, filtered, and saved.
 
 ```console
+
+Powerful pattern-based wordlist generation tool.
+
 General Options:
   -h, --help            show this help message and exit
   -v, --version         show version information and exit
