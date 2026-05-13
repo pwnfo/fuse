@@ -380,7 +380,7 @@ class TestGenerate:
 
     def test_start_from(self):
         result = self._gen("[abc][12]", start_from="b1")
-        assert result == ["b2", "c1", "c2"]
+        assert result == ["b1", "b2", "c1", "c2"]
 
     def test_end(self):
         result = self._gen("[abc][12]", end="b1")
@@ -388,7 +388,7 @@ class TestGenerate:
 
     def test_start_from_and_end(self):
         result = self._gen("[abc][12]", start_from="a2", end="b2")
-        assert result == ["b1", "b2"]
+        assert result == ["a2", "b1", "b2"]
 
     def test_complex_mixed(self):
         result = self._gen("[ab]{1,2}")
@@ -435,7 +435,7 @@ class TestStats:
 
     def test_stats_with_start_from(self):
         _, total_words = self._stats("[abc][12]", start_from="b1")
-        assert total_words == 3  # b2, c1, c2
+        assert total_words == 4  # b1, b2, c1, c2
 
     def test_stats_with_end(self):
         _, total_words = self._stats("[abc][12]", end="b1")

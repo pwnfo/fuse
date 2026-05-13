@@ -812,9 +812,10 @@ class WordlistGenerator:
 
         for item in iterator:
             if not found:
-                if item == start_from:
+                if item >= start_from:
                     found = True
-                continue
+                else:
+                    continue
 
             yield item
 
@@ -994,7 +995,7 @@ class WordlistGenerator:
         start_deduction = 0
         if start_from:
             start_idx = self._calculate_skipped_count(nodes, start_from)
-            start_deduction = start_idx + 1
+            start_deduction = start_idx
 
         end_cap = full_total_count
         if end:
