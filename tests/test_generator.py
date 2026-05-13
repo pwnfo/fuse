@@ -175,11 +175,11 @@ class TestTokenize:
         assert tokens == [("CLASS", ["cat", "dog"])]
 
     def test_unclosed_class_raises(self):
-        with pytest.raises(ExprError, match="unclosed class"):
+        with pytest.raises(ExprError, match="unclosed character class"):
             self.gen.tokenize("[abc")
 
     def test_empty_class_raises(self):
-        with pytest.raises(ExprError, match="empty class"):
+        with pytest.raises(ExprError, match="empty character class"):
             self.gen.tokenize("[]")
 
     def test_literal_group(self):
@@ -187,7 +187,7 @@ class TestTokenize:
         assert tokens == [("CLASS", ["hello"])]
 
     def test_unclosed_literal_group_raises(self):
-        with pytest.raises(ExprError, match="unclosed class"):
+        with pytest.raises(ExprError, match="unclosed character class"):
             self.gen.tokenize("(hello")
 
     def test_numeric_range(self):

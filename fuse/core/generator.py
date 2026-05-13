@@ -331,9 +331,9 @@ class FileNode(Node):
                         raise IOError
                     out.extend(ln.rstrip("\n\r") for ln in fp)
             except (IOError, OSError):
-                raise ExprError(f"failed to open or read file: {path}")
+                raise ExprError(f"failed to open or read file {path!r}")
         if not out:
-            raise ExprError(f"file node produced no lines: {self.base}")
+            raise ExprError(f"no lines produced from files {self.base!r}")
         self._cached_lines = out
         return out
 
@@ -507,28 +507,28 @@ class WordlistGenerator:
     def _parse_range(self, pattern: str, start_idx: int) -> tuple[list[str], int]:
         end_pos = self._find_closing(pattern, start_idx, "]")
         if end_pos == -1:   
-            raise ExprError("unclosed range: missing ']'.", error_pos=(pattern, start_idx))
+            raise ExprError("unclosed range (missing ']')", error_pos=(pattern, start_idx))
         inner = pattern[start_idx:end_pos]
         m = self.RANGE_RE.match(inner)
         if not m:
-            raise ExprError("invalid range: expected '#[START-END[:STEP]]'.", error_pos=(pattern, start_idx))
+            raise ExprError("invalid range syntax (expected '#[START-END[:STEP]]')", error_pos=(pattern, start_idx))
         r_start = int(m.group(1))
         r_end = int(m.group(2))
         step_str = m.group(3)
         step = int(step_str) if step_str else (1 if r_start <= r_end else -1)
         if step == 0:
-            raise ExprError("invalid range: step cannot be zero.", error_pos=(pattern, start_idx))
+            raise ExprError("range step cannot be zero", error_pos=(pattern, start_idx))
         if r_start < 0 or r_end < 0:
-            raise ExprError("invalid range: start/end must be non-negative.", error_pos=(pattern, start_idx))
+            raise ExprError("range bounds must be non-negative", error_pos=(pattern, start_idx))
         if (step > 0 and r_start > r_end) or (step < 0 and r_start < r_end):
-            raise ExprError("invalid range sequence.", error_pos=(pattern, start_idx))
+            raise ExprError("invalid range sequence", error_pos=(pattern, start_idx))
         if step > 0:
             rng = range(r_start, r_end + 1, step)
         else:
             rng = range(r_start, r_end - 1, step)
         choices = [str(x) for x in rng]
         if not choices:
-            raise ExprError("invalid range: produced no values.", error_pos=(pattern, start_idx))
+            raise ExprError("range produced no values", error_pos=(pattern, start_idx))
         return choices, end_pos + 1
 
     def _parse_class(
@@ -537,10 +537,10 @@ class WordlistGenerator:
         closer = ")" if literal_mode else "]"
         end_pos = self._find_closing(pattern, start_idx, closer)
         if end_pos == -1:
-            raise ExprError(f"unclosed class: missing '{closer}'.", error_pos=(pattern, start_idx))
+            raise ExprError(f"unclosed character class (missing {closer!r})", error_pos=(pattern, start_idx))
         inner = pattern[start_idx:end_pos]
         if not inner:
-            raise ExprError("empty class is not allowed.", error_pos=(pattern, start_idx))
+            raise ExprError("empty character class is not allowed", error_pos=(pattern, start_idx))
         if literal_mode:
             return [inner], end_pos + 1
         if "|" not in inner and "\\" not in inner:
@@ -562,7 +562,7 @@ class WordlistGenerator:
         segments.append("".join(buf))
         choices = [s.strip() for s in segments if s.strip()]
         if not choices:
-            raise ExprError("invalid character class contents.", error_pos=(pattern, start_idx))
+            raise ExprError("invalid character class contents", error_pos=(pattern, start_idx))
         return choices, end_pos + 1
 
     def _tokenize_raw(self, pattern: str) -> list[tuple[str, Any]]:
@@ -576,7 +576,7 @@ class WordlistGenerator:
             c = pr[i]
             if c == "\\":
                 if i + 1 >= n:
-                    raise ExprError("invalid escape: ends with backslash.", error_pos=(pattern, i+1))
+                    raise ExprError("invalid escape sequence (trailing backslash)", error_pos=(pattern, i+1))
                 tokens.append(("LIT", pr[i + 1]))
                 i += 2
                 continue
@@ -584,19 +584,19 @@ class WordlistGenerator:
                 if i + 1 < n and pr[i + 1] == "@":
                     end = self._find_binding_close(pr, i + 2)
                     if end == -1:
-                        raise ExprError("unclosed binding: missing '>'.", error_pos=(pattern, i+1))
+                        raise ExprError("unclosed binding (missing '>')", error_pos=(pattern, i+1))
                     inner = pr[i + 2 : end]
                     eq_pos = inner.find("=")
                     if eq_pos == -1:
                         name = inner.strip()
                         if not name.isidentifier():
-                            raise ExprError(f"invalid binding name: {name!r}.", error_pos=(pattern, i+1))
+                            raise ExprError(f"invalid binding name {name!r}", error_pos=(pattern, i+1))
                         tokens.append(("BIND_REF", name))
                     else:
                         name = inner[:eq_pos].strip()
                         expr = inner[eq_pos + 1 :]
                         if not name.isidentifier():
-                            raise ExprError(f"invalid binding name: {name!r}.", error_pos=(pattern, i+1))
+                            raise ExprError(f"invalid binding name {name!r}", error_pos=(pattern, i+1))
                         inner_tokens = self._tokenize_raw(expr)
                         tokens.append(("BIND_DEF", (name, inner_tokens)))
                     i = end + 1
@@ -637,12 +637,12 @@ class WordlistGenerator:
                     a = int(m.group(1))
                     b = int(m.group(2)) if m.group(2) is not None else a
                     if a > b:
-                        raise ExprError("invalid repetition: min > max.", error_pos=(pattern, i+1))
+                        raise ExprError("invalid repetition range (min > max)", error_pos=(pattern, i+1))
                     tokens.append(("BRACES", (a, b)))
                     i += m.end()
                     continue
                 else:
-                    raise ExprError("invalid repetition syntax.", error_pos=(pattern, i+1))
+                    raise ExprError("invalid repetition syntax", error_pos=(pattern, i+1))
             tokens.append(("LIT", c))
             i += 1
         return tokens
@@ -676,7 +676,7 @@ class WordlistGenerator:
                 nodes.append(Node(val, min_rep, max_rep))
             elif kind == "FILE":
                 if file_idx >= len(file_groups):
-                    raise ExprError("insufficient file assignments.")
+                    raise ExprError("insufficient file assignments")
                 nodes.append(FileNode(file_groups[file_idx], min_rep, max_rep))
                 file_idx += 1
             elif kind == "BIND_DEF":
@@ -688,7 +688,7 @@ class WordlistGenerator:
             elif kind == "BIND_REF":
                 nodes.append(BindRefNode(val, min_rep, max_rep))
             else:
-                raise ExprError(f"unexpected token: {kind}")
+                raise ExprError(f"unexpected token {kind!r}")
             i += 1
         return nodes, file_idx
 
@@ -709,13 +709,13 @@ class WordlistGenerator:
         count_ft = self._count_file_tokens(tokens)
         if count_ft:
             if not files:
-                raise ExprError("pattern requires files but none provided.")
+                raise ExprError("pattern requires files but none were provided")
             if count_ft == 1:
                 file_groups: list[list[str]] = [files]
             else:
                 if len(files) < count_ft:
                     raise ExprError(
-                        f"pattern requires {count_ft} files, {len(files)} provided."
+                        f"pattern requires {count_ft} files but {len(files)} were provided"
                     )
                 file_groups = [[f] for f in files[:count_ft]]
         else:
@@ -771,7 +771,7 @@ class WordlistGenerator:
 
         if isinstance(cur, BindRefNode):
             if cur.name not in bindings:
-                raise ExprError(f"undefined variable '{cur.name}'.")
+                raise ExprError(f"undefined variable {cur.name!r}")
             val_base = bindings[cur.name]
             for r in range(cur.min_rep, cur.max_rep + 1):
                 val = val_base * r if r > 0 else ""
@@ -853,7 +853,7 @@ class WordlistGenerator:
                     break
             elif isinstance(node, BindRefNode):
                 if node.name not in bindings:
-                    raise ExprError(f"undefined variable '{node.name}'.")
+                    raise ExprError(f"undefined variable {node.name!r}")
                 val = bindings[node.name]
                 # ref adds combinations only when repetition varies
                 if node.min_rep != node.max_rep:
@@ -900,7 +900,7 @@ class WordlistGenerator:
                 result.append(val)
             elif isinstance(node, BindRefNode):
                 if node.name not in bindings:
-                    raise ExprError(f"undefined variable '{node.name}'.")
+                    raise ExprError(f"undefined variable {node.name!r}")
                 val_base = bindings[node.name]
                 if node.min_rep != node.max_rep:
                     node_idx = index // suffix_cap
@@ -937,7 +937,7 @@ class WordlistGenerator:
                 binding_stats[node.name] = (inner_count, avg_len)
             elif isinstance(node, BindRefNode):
                 if node.name not in binding_stats:
-                    raise ExprError(f"undefined variable '{node.name}'.")
+                    raise ExprError(f"undefined variable {node.name!r}")
                 _, avg_len = binding_stats[node.name]
                 node_count = 1
                 node_bytes = avg_len

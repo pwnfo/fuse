@@ -23,9 +23,6 @@
 > [!NOTE]  
 > It is **recommended** to install using `pipx` or `pip` for the PyPI version.
 
-> [!NOTE]  
-> The PyPI package has been renamed from `fuse-tool` to `fuse-generator`.
-
 | Method | Notes |
 | - | - |
 | `pipx install fuse-generator` | `pip` may be used in place of `pipx` |
@@ -49,28 +46,32 @@ Outputs can be manipulated, filtered, and saved.
 ```console
 General Options:
   -h, --help            show this help message and exit
-  -v, --version         show version message and exit
-  -o, --output <path>   write the wordlist in the file
-  -f, --file <path>     file with different expressions
-  -q, --quiet           use quiet mode
+  -v, --version         show version information and exit
+  -q, --quiet           suppress non-essential output
   -n, --non-interactive
-                        disable interactive prompt before execution
+                        skip the confirmation prompt before execution
 
 Generation Options:
   -d, --delimiter <string>
-                        delimiter between entries
+                        string inserted between generated entries
   -b, --write-buffer <size>
-                        write buffer size
-  -w, --workers <1-64>  number of workers (default is 1)
-  -F, --filter <regex>  filter generated words using a regex
+                        output buffer size
+  -w, --workers <1-64>  number of worker processes (default: 1)
+  -F, --filter <regex>  filter generated words with a regular expression
   -k, --flush-threshold <size>
-                        byte threshold before flushing output (default is 512KB)
+                        flush output after reaching this byte threshold (default: 512KB)
+
+Input Options:
+  -f, --file <path>     load expressions from file
+  -S, --start <word>    start writing output from <word>
+  -E, --end <word>      stop writing output at <word>
+
+Output Options:
+  -o, --output <path>   write output to a file
   -z, --compress <format>
-                        compress output (available: gzip, bzip2 and lzma)
+                        compress output (supported: gzip, bzip2, lzma)
   -l, --compresslevel <level>
-                        compression level (depends on selected format)
-  -S, --start <word>    start writing the wordlist from <word>
-  -E, --end <word>      end writing the wordlist at <word>
+                        compression level for the selected format
 ```
 
 ### Expression basics
