@@ -1,6 +1,6 @@
 import pytest
 
-from fuse.core.classes import CHAR_CLASSES, pattern_repl
+from fuse.utils.classes import CHAR_CLASSES, pattern_repl
 
 
 class TestCharClasses:

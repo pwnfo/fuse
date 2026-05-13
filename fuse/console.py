@@ -17,7 +17,7 @@ from rich.progress import (
 from rich.text import Text
 from rich.theme import Theme
 
-from fuse.core.formatters import format_size
+from fuse.utils.formatters import format_size
 
 # -------------------------------------
 # progress bar configuration constants.

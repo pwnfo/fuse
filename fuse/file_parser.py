@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 from typing import Iterator
 
-from fuse.files import fuse_open
+from fuse.utils.files import fuse_open
 
 
 class InvalidSyntaxError(Exception):

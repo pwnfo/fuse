@@ -6,7 +6,7 @@ import pytest
 from fuse.compression import (
     get_compression_extension,
 )
-from fuse.files import fuse_open
+from fuse.utils.files import fuse_open
 
 
 class TestCompressionExtensions:
