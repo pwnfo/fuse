@@ -1,8 +1,9 @@
 import re
 import sys
 import tty
-import termios
 import ctypes
+import termios
+import threading
 import multiprocessing
 
 from dataclasses import dataclass
@@ -65,10 +66,10 @@ def generate(
         int: status code for CLI exit
     """
     pattern = None
+    start_time = None
     progress = multiprocessing.Value(ctypes.c_longlong, 0)
     total_bytes, total_words = stats
 
-    # compile filter regex if provided.
     if options.filter is not None:
         try:
             pattern = re.compile(options.filter)
@@ -81,211 +82,267 @@ def generate(
     if options.threads > 1:
         log.warning("Using multiple workers may result in interleaved output.")
 
-    # event used by workers to stop the
-    # progress bar process
-    event = multiprocessing.Event()
-
-    progress_proc = multiprocessing.Process(
-        target=get_progress, args=(event, progress), kwargs={"total": total_bytes}
+    event = threading.Event()
+    progress_thread = threading.Thread(
+        target=get_progress,
+        args=(event, progress),
+        kwargs={"total": total_bytes},
+        daemon=True,
     )
+
     show_progress_bar = (options.filename is not None) and (not options.quiet_mode)
+    start_token, end_token = options.wrange
 
-    with fuse_open(
-        options.filename,
-        "a",
-        encoding="utf-8",
-        buffering=options.buffering,
-        compression=options.compression,
-        compresslevel=options.compresslevel,
-    ) as fp:
-        if not fp:
-            return 1
+    def stop_progress() -> None:
+        """Signal progress thread to stop and wait for it."""
+        if progress_thread.is_alive() and not event.is_set():
+            event.set()
+            progress_thread.join()
 
-        start_token, end_token = options.wrange
+    def start_progress_bar() -> None:
+        """Start progress bar thread."""
+        nonlocal start_time
 
-        if show_progress_bar:
-            # start progress bar process
-            progress_proc.start()
+        log.info(datetime.now().strftime("[bold]Started at %H:%M:%S on %a, %b %d %Y.[/]"))
+
+        if show_progress_bar and not progress_thread.is_alive():
+            progress_thread.start()
 
         start_time = perf_counter()
 
-        def stop_progress() -> None:
-            """Signal progress thread to stop and wait for it."""
-            if show_progress_bar and not event.is_set():
-                event.set()
-                progress_proc.join()
+    try:
+        if options.threads > 1:
+            # multi-process generation with writer process.
+            writer_failed = multiprocessing.Event()
+            writer_status_parent, writer_status_child = multiprocessing.Pipe()
 
-        log.info(
-            datetime.now().strftime("[bold]Started at %H:%M:%S on %a, %b %d %Y.[/]")
-        )
+            def writer_process(
+                queue: multiprocessing.Queue,
+                filename: str | None,
+                buffering: int,
+                compression: CompressionFormat | None,
+                compresslevel: int | None,
+                progress: Synchronized,
+                stop_event: Event,
+                writer_failed: Event,
+                status_conn,
+            ) -> None:
+                """Write to output file when workers send data to the queue."""
+                try:
+                    with fuse_open(
+                        filename,
+                        "a",
+                        encoding="utf-8",
+                        buffering=buffering,
+                        compression=compression,
+                        compresslevel=compresslevel,
+                    ) as fp:
+                        if not fp:
+                            writer_failed.set()
+                            stop_event.set()
+                            try:
+                                status_conn.send(False)
+                            except Exception:
+                                pass
+                            return
 
-        try:
-            if options.threads > 1:
-                # multi threaded generation with writer process.
-                def writer_process(
-                    queue: multiprocessing.Queue,
-                    filename: str | None,
-                    buffering: int,
-                    compression: CompressionFormat | None,
-                    compresslevel: int | None,
-                    progress: Synchronized,
-                    stop_event: Event,
-                ) -> None:
-                    """Write to output file when workers send data to the queue."""
+                        try:
+                            status_conn.send(True)
+                        except Exception:
+                            pass
+
+                        while True:
+                            data = queue.get()
+                            if data is None:
+                                break
+
+                            progress.value += fp.write(data)
+
+                except Exception as e:
+                    stop_event.set()
+                    writer_failed.set()
                     try:
-                        with fuse_open(
-                            filename,
-                            "a",
-                            encoding="utf-8",
-                            buffering=buffering,
-                            compression=compression,
-                            compresslevel=compresslevel,
-                        ) as fp:
-                            if not fp:
-                                return
-
-                            while not (stop_event.is_set() and queue.empty()):
-                                try:
-                                    data = queue.get(timeout=0.5)
-                                except Exception:
-                                    continue
-
-                                if data is None:
-                                    break
-
-                                progress.value += fp.write(data)
-
-                    except Exception as e:
-                        log.error(f"writer error: {e}")
-
-                def worker_process(
-                    generator: FuseGenerator,
-                    nodes: list[Node],
-                    start_from: str | None,
-                    end: str | None,
-                    queue: Any,
-                    delimiter: str,
-                    pattern: re.Pattern[str] | None,
-                ) -> None:
-                    """Worker process for word generation"""
-                    buf: list[str] = []
-                    buf_bytes: int = 0
-                    flush_limit = options.flush_limit
-
+                        status_conn.send(False)
+                    except Exception:
+                        pass
+                    log.error(f"writer error: {e}")
+                finally:
                     try:
-                        for token in generator.generate(
-                            nodes, start_from=start_from, end=end
-                        ):
-                            if pattern is not None and not pattern.match(token):
-                                continue
+                        status_conn.close()
+                    except Exception:
+                        pass
 
-                            item = token + delimiter
-
-                            buf.append(item)
-                            buf_bytes += len(item)
-
-                            if buf_bytes >= flush_limit:
-                                queue.put("".join(buf))
-                                buf.clear()
-                                buf_bytes = 0
-
-                        # writes the remaining content of `buf`
-                        if buf:
-                            queue.put("".join(buf))
-
-                    except Exception as e:
-                        log.error(f"worker error: {e}")
-
-                queue: Queue = multiprocessing.Queue(maxsize=128)
-
-                # event used to stop workers
-                stop_event = multiprocessing.Event()
-
-                writer = multiprocessing.Process(
-                    target=writer_process,
-                    args=(
-                        queue,
-                        options.filename,
-                        options.buffering,
-                        options.compression,
-                        options.compresslevel,
-                        progress,
-                        stop_event,
-                    ),
-                )
-                writer.start()
-
-                workers: list[multiprocessing.Process] = []
-
-                start_idx = 0
-                if start_token is not None:
-                    start_idx, _ = generator._calculate_skipped_stats(
-                        nodes, start_token
-                    )
-
-                # ---------------------------------------------------------------------------
-                # calculates the word generation portion for each worker and initializes them
-                # ---------------------------------------------------------------------------
-
-                count = total_words
-                step = count // options.threads
-                remainder = count % options.threads
-                current_idx = start_idx
-
-                for i in range(options.threads):
-                    t_count = step + (1 if i < remainder else 0)
-                    if t_count == 0:
-                        continue
-
-                    if i == 0:
-                        w_start = start_token
-                    else:
-                        w_start = generator.get_word_at_index(nodes, current_idx - 1)
-
-                    current_idx += t_count
-                    w_end = generator.get_word_at_index(nodes, current_idx - 1)
-
-                    p = multiprocessing.Process(
-                        target=worker_process,
-                        args=(
-                            generator,
-                            nodes,
-                            w_start,
-                            w_end,
-                            queue,
-                            options.delimiter,
-                            pattern,
-                        ),
-                    )
-                    workers.append(p)
-                    p.start()
-
-                # ---------------------------------------------------------------------------
-
-                # waits for each worker to finish before continuing
-                for p in workers:
-                    p.join()
-
-                stop_event.set()
-
-                queue.put(None)  # signals the writer to stop
-                writer.join()
-            else:
-                # word generation using a single thread
-
-                buf = []
-                buf_bytes = 0
+            def worker_process(
+                generator: FuseGenerator,
+                nodes: list[Node],
+                start_from: str | None,
+                end: str | None,
+                queue: Any,
+                delimiter: str,
+                pattern: re.Pattern[str] | None,
+                stop_event: Event,
+                writer_failed: Event,
+            ) -> None:
+                """Worker process for word generation."""
+                buf: list[str] = []
+                buf_bytes: int = 0
                 flush_limit = options.flush_limit
 
+                def safe_put(item: str) -> bool:
+                    while not stop_event.is_set() and not writer_failed.is_set():
+                        try:
+                            queue.put(item, timeout=0.5)
+                            return True
+                        except Exception:
+                            continue
+                    return False
+
                 try:
+                    for token in generator.generate(
+                        nodes, start_from=start_from, end=end
+                    ):
+                        if stop_event.is_set() or writer_failed.is_set():
+                            return
+
+                        if pattern is not None and not pattern.match(token):
+                            continue
+
+                        item = token + delimiter
+                        buf.append(item)
+                        buf_bytes += len(item)
+
+                        if buf_bytes >= flush_limit:
+                            if not safe_put("".join(buf)):
+                                return
+                            buf.clear()
+                            buf_bytes = 0
+
+                    if buf:
+                        safe_put("".join(buf))
+
+                except Exception as e:
+                    log.error(f"worker error: {e}")
+                    stop_event.set()
+                    writer_failed.set()
+
+            queue: Queue = multiprocessing.Queue(maxsize=128)
+            stop_event = multiprocessing.Event()
+
+            writer = multiprocessing.Process(
+                target=writer_process,
+                args=(
+                    queue,
+                    options.filename,
+                    options.buffering,
+                    options.compression,
+                    options.compresslevel,
+                    progress,
+                    stop_event,
+                    writer_failed,
+                    writer_status_child,
+                ),
+            )
+            writer.start()
+            writer_status_child.close()
+
+            try:
+                writer_ok = writer_status_parent.recv()
+            except EOFError:
+                stop_event.set()
+                writer.join()
+                stop_progress()
+                return 1
+            finally:
+                try:
+                    writer_status_parent.close()
+                except Exception:
+                    pass
+
+            if not writer_ok or writer_failed.is_set():
+                stop_event.set()
+                writer.join()
+                stop_progress()
+                return 1
+
+            start_progress_bar()
+
+            workers: list[multiprocessing.Process] = []
+
+            start_idx = 0
+            if start_token is not None:
+                start_idx, _ = generator._calculate_skipped_stats(nodes, start_token)
+
+            count = total_words
+            step = count // options.threads
+            remainder = count % options.threads
+            current_idx = start_idx
+
+            for i in range(options.threads):
+                t_count = step + (1 if i < remainder else 0)
+                if t_count == 0:
+                    continue
+
+                if i == 0:
+                    w_start = start_token
+                else:
+                    w_start = generator.get_word_at_index(nodes, current_idx - 1)
+
+                current_idx += t_count
+                w_end = generator.get_word_at_index(nodes, current_idx - 1)
+
+                p = multiprocessing.Process(
+                    target=worker_process,
+                    args=(
+                        generator,
+                        nodes,
+                        w_start,
+                        w_end,
+                        queue,
+                        options.delimiter,
+                        pattern,
+                        stop_event,
+                        writer_failed,
+                    ),
+                )
+                workers.append(p)
+                p.start()
+
+            for p in workers:
+                p.join()
+
+            stop_event.set()
+            queue.put(None)
+            writer.join()
+
+            if writer_failed.is_set() or writer.exitcode not in (0, None):
+                stop_progress()
+                return 1
+
+        else:
+            buf = []
+            buf_bytes = 0
+            flush_limit = options.flush_limit
+
+            try:
+                start_progress_bar()
+
+                with fuse_open(
+                    options.filename,
+                    "a",
+                    encoding="utf-8",
+                    buffering=options.buffering,
+                    compression=options.compression,
+                    compresslevel=options.compresslevel,
+                ) as fp:
+                    if not fp:
+                        stop_progress()
+                        return 1
+
                     for token in generator.generate(nodes, start_from=start_token):
                         item = token + options.delimiter
                         item_l = len(item)
 
-                        if pattern is not None and not re.match(pattern, token):
-                            # it does not increment `progress.value` to
-                            # increase performance.
-                            # progress.value += item_l
+                        if pattern is not None and not pattern.match(token):
                             continue
 
                         buf.append(item)
@@ -300,32 +357,29 @@ def generate(
                             stop_progress()
                             break
 
-                    # writes the remaining content of `buf`
                     if buf:
-                        fp.write("".join(buf))
+                        progress.value += fp.write("".join(buf))
 
-                except KeyboardInterrupt:
-                    stop_progress()
-                    log.error("Generation stopped with keyboard interrupt!")
+            except KeyboardInterrupt:
+                stop_progress()
+                log.error("Generation stopped with keyboard interrupt!")
+                return 1
 
-                    return 1
-        except Exception:
-            stop_progress()
-            raise
-
-        elapsed = perf_counter() - start_time
+    except Exception:
         stop_progress()
+        raise
 
-    if show_progress_bar and progress_proc.is_alive():
-        progress_proc.join()
+    stop_progress()
 
-    speed = int(total_words / elapsed) if elapsed > 0 else 0
-    log.info(
-        f"[bold]Finished in [magenta]{format_time(elapsed)}[/magenta] ({speed} W/s).[/]"
-    )
+    if start_time is not None:
+        elapsed = perf_counter() - start_time
+        speed = int(total_words / elapsed) if elapsed > 0 else 0
+        log.info(
+            f"[bold]Finished in [magenta]{format_time(elapsed)}[/magenta] ({speed} W/s).[/]"
+        )
+        return 0
 
-    return 0
-
+    return 1
 
 def pause(prompt: str = "\u203a Press the Enter key to continue") -> bool:
     """Pause execution and wait for user input in terminal."""
