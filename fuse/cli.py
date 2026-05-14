@@ -12,24 +12,22 @@ from logging import ERROR
 from typing import Any
 from time import perf_counter
 from fuse import __version__, BANNER
-from argparse import Namespace
 
 from fuse.logger import log
 from fuse.args import create_parser
 from fuse.console import get_progress
 from fuse.utils.files import fuse_open
-from fuse.compression import ensure_compression_extension
 from fuse.utils.formatters import format_size, format_time, parse_size
 from fuse.generator import ExprError, Node, FuseGenerator
 from fuse.file_parser import InvalidSyntaxError, process_expr_file
 from fuse.compression import (
     CompressionFormat,
     COMPRESSION_LEVEL_RANGES,
-    COMPRESSION_DEFAULT_LEVELS,
 )
 from multiprocessing.synchronize import Event
 from multiprocessing.sharedctypes import Synchronized
 from multiprocessing.queues import Queue
+from multiprocessing.connection import Connection
 
 
 @dataclass
@@ -103,7 +101,9 @@ def generate(
         """Start progress bar thread."""
         nonlocal start_time
 
-        log.info(datetime.now().strftime("[bold]Started at %H:%M:%S on %a, %b %d %Y.[/]"))
+        log.info(
+            datetime.now().strftime("[bold]Started at %H:%M:%S on %a, %b %d %Y.[/]")
+        )
 
         if show_progress_bar and not progress_thread.is_alive():
             progress_thread.start()
@@ -125,7 +125,7 @@ def generate(
                 progress: Synchronized,
                 stop_event: Event,
                 writer_failed: Event,
-                status_conn,
+                status_conn: Connection,
             ) -> None:
                 """Write to output file when workers send data to the queue."""
                 try:
@@ -380,6 +380,7 @@ def generate(
         return 0
 
     return 1
+
 
 def pause(prompt: str = "\u203a Press the Enter key to continue") -> bool:
     """Pause execution and wait for user input in terminal."""
